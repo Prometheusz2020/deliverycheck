@@ -1,0 +1,35 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Driver {
+  id              String     @id @default(uuid())
+  name            String     @unique
+  password        String     @default("1234")
+  totalFeesEarned Float      @default(0)
+  deliveries      Delivery[]
+  createdAt       DateTime   @default(now())
+}
+
+model Delivery {
+  id             String    @id @default(uuid())
+  orderNumber    String
+  customerName   String?
+  address        String?
+  totalAmount    Float?
+  deliveryFee    Float     @default(0)
+  status         String    @default("PENDENTE") // PENDENTE, EM ROTA, ENTREGUE, CANCELADO
+  driverId       String?
+  driver         Driver?   @relation(fields: [driverId], references: [id])
+  deliveryPerson String?   // Nome textual para redundância
+  scannedAt      DateTime  @default(now())
+  deliveredAt    DateTime?
+  paymentMethod  String?
+  observations   String?
+  updatedAt      DateTime  @updatedAt
+}

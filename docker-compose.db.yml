@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  # Database service (Hetzner)
+  database:
+    image: postgres:15-alpine
+    container_name: delivery_db
+    environment:
+      POSTGRES_USER: delivery_user
+      POSTGRES_PASSWORD: delivery_password_secure
+      POSTGRES_DB: delivery_check
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    restart: always
+
+volumes:
+  db_data:
