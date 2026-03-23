@@ -10,15 +10,9 @@ export async function processReceipt(imageBufferOrUrl: string | File) {
 
     console.log("OCR Result RAW:", text);
 
-    // Regex processing - More robust and explicit for requested fields
-    const orderMatch = 
-      text.match(/Delivery\s*[#H+N]\s*(\d+)/i) || 
-      text.match(/DELIVERY\s*[#H+N]\s*(\d+)/i) || 
-      text.match(/Delivery\s*(\d+)/i) ||
-      text.match(/#\s*(\d+)/) ||
-      text.match(/Pedido\s*#?\s*(\d+)/i);
-    
-    const orderNumber = orderMatch ? orderMatch[1] : `ID-${Date.now().toString().slice(-4)}`;
+    // Regex processing - Focus on everything after "Delivery" as requested
+    const deliveryLineMatch = text.match(/Delivery\s*(.*)/i);
+    const orderNumber = deliveryLineMatch ? deliveryLineMatch[1].trim() : `ID-${Date.now().toString().slice(-4)}`;
 
     const addressMatch = text.match(/End:\s*(.*)/i);
     const address = addressMatch ? addressMatch[1].trim() : "Não detectado";
@@ -32,14 +26,8 @@ export async function processReceipt(imageBufferOrUrl: string | File) {
       deliveryFee = parseFloat(feeMatch[1].replace(',', '.'));
     }
 
-    const totalMatch = 
-      text.match(/Total\s*a\s*pagar\s*R?\$?\s*([\d\.\,]+)/i) || 
-      text.match(/Total\s*pagar\s*R?\$?\s*([\d\.\,]+)/i);
-    
-    let totalAmount = 0;
-    if (totalMatch) {
-      totalAmount = parseFloat(totalMatch[1].replace(',', '.'));
-    }
+    // Total a pagar removido temporariamente conforme solicitado
+    const totalAmount = 0;
 
     const payMatch = text.match(/Forma de pagamento:\s*(.*)/i) || text.match(/Forma de pagamento\s*(.*)/i) || text.match(/Pagamento:\s*(.*)/i);
     const paymentMethod = payMatch ? payMatch[1].trim() : "Não detectado";
