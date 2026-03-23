@@ -94,12 +94,10 @@ export default function RestaurantPortal() {
         </div>
       </header>
 
-      <div className="grid-quarters">
+      <div className="grid-quarters" style={{ gridTemplateColumns: 'repeat(2, 1fr)' }}>
         {[
           { label: 'Pendentes', val: summary.pending, icon: Clock, color: 'var(--warning)' },
-          { label: 'Em Rota', val: summary.onRoute, icon: TrendingUp, color: 'var(--primary)' },
-          { label: 'Total Pedidos', val: `R$ ${summary.totalValue.toFixed(2)}`, icon: BarChart2, color: 'var(--success)' },
-          { label: 'Total Taxas', val: `R$ ${summary.totalFees.toFixed(2)}`, icon: DollarSign, color: 'var(--secondary)' }
+          { label: 'Em Rota', val: summary.onRoute, icon: TrendingUp, color: 'var(--primary)' }
         ].map((c, i) => (
           <div key={i} className="card-premium" style={{ padding: '1.5rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', color: c.color, marginBottom: '1.5rem' }}>
@@ -249,7 +247,6 @@ export default function RestaurantPortal() {
               {drivers.map(dr => (
                 <div key={dr.id} className="card-premium">
                   <p style={{ fontWeight: 800 }}>{dr.name}</p>
-                  <p style={{ color: 'var(--accent)', fontWeight: 800 }}>Ganhos: R$ {dr.totalFeesEarned.toFixed(2)}</p>
                 </div>
               ))}
             </div>
