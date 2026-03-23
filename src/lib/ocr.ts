@@ -10,9 +10,22 @@ export async function processReceipt(imageBufferOrUrl: string | File) {
 
     console.log("OCR Result RAW:", text);
 
-    // Regex processing - Focus on everything after "Delivery" as requested
+    // Regex processing - Focus on everything after "Delivery" and look near "Skina Beer"
+    const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+    let orderNumber = `ID-${Date.now().toString().slice(-4)}`;
+
+    // 1. Try traditional "Delivery" keyword anywhere
     const deliveryLineMatch = text.match(/Delivery\s*(.*)/i);
-    const orderNumber = deliveryLineMatch ? deliveryLineMatch[1].trim() : `ID-${Date.now().toString().slice(-4)}`;
+    if (deliveryLineMatch) {
+      orderNumber = deliveryLineMatch[1].trim();
+    } 
+    // 2. Try looking specifically after "Skina Beer" (for cases where # is misread)
+    else {
+      const skinaIndex = lines.findIndex(l => l.toUpperCase().includes("SKINA BEER") || l.toUpperCase().includes("SKINA"));
+      if (skinaIndex !== -1 && skinaIndex < lines.length - 1) {
+        orderNumber = lines[skinaIndex + 1]; // Pegar a linha seguinte
+      }
+    }
 
     const addressMatch = text.match(/End:\s*(.*)/i);
     const address = addressMatch ? addressMatch[1].trim() : "Não detectado";
