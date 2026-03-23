@@ -6,8 +6,8 @@ import {
   getSessionDriver, logoutAdmin 
 } from "@/lib/auth-actions";
 import { 
-  Camera, CheckCircle, Clock, MapPin, User, LogOut, 
-  Package, Zap, Loader2, ArrowRight, ShieldCheck, QrCode 
+  Camera, CheckCircle, MapPin, User, LogOut, 
+  Package, Zap, Loader2, ArrowRight, ShieldCheck 
 } from "lucide-react";
 
 export default function DriverApp() {
@@ -158,11 +158,12 @@ export default function DriverApp() {
   }
 
   const myDeliveries = deliveries.filter(d => d.driverId === driver.id && d.status !== 'ENTREGUE');
+  const finishedDeliveries = deliveries.filter(d => d.driverId === driver.id && d.status === 'ENTREGUE');
   const availableDeliveries = deliveries.filter(d => !d.driverId && d.status === 'PENDENTE');
 
   return (
     <div className="page-container animate-entrance" style={{ maxWidth: '600px', marginTop: '1rem' }}>
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', padding: '1rem', background: 'var(--surface-high)', borderRadius: '20px' }}>
+      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', padding: '1rem', background: 'var(--surface-high)', borderRadius: '20px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <div style={{ width: '40px', height: '40px', background: 'var(--accent)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#000' }}>
             <User size={20} />
@@ -177,41 +178,38 @@ export default function DriverApp() {
         </button>
       </header>
 
-      <div style={{ marginBottom: '2rem' }}>
-        <label className="btn-main" style={{ cursor: 'pointer', height: '140px', flexDirection: 'column', gap: '1rem', fontSize: '1.2rem', background: 'linear-gradient(135deg, var(--primary), #0076fe)', color: '#fff', border: 'none' }}>
-          {isScanning ? <Loader2 size={40} className="spin" /> : <Camera size={40} />}
+      <div style={{ marginBottom: '1.5rem' }}>
+        <label className="btn-main" style={{ cursor: 'pointer', height: '100px', flexDirection: 'column', gap: '0.5rem', fontSize: '1.1rem', background: 'linear-gradient(135deg, var(--primary), #0076fe)', color: '#fff', border: 'none' }}>
+          {isScanning ? <Loader2 size={32} className="spin" /> : <Camera size={32} />}
           <span>Escanear Novo Pedido</span>
           <input type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={handleFileUpload} />
         </label>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', paddingBottom: '3rem' }}>
         <div>
-          <h3 style={{ fontSize: '0.9rem', color: 'var(--accent)', fontWeight: 900, textTransform: 'uppercase', marginBottom: '1rem', letterSpacing: '0.2em' }}>Minhas Entregas</h3>
+          <h3 style={{ fontSize: '0.8rem', color: 'var(--accent)', fontWeight: 900, textTransform: 'uppercase', marginBottom: '1rem', letterSpacing: '0.2em', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Zap size={14} /> Entregas Ativas
+          </h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             {myDeliveries.length === 0 ? (
-              <div className="card-premium" style={{ textAlign: 'center', padding: '3rem', opacity: 0.5, borderStyle: 'dashed' }}>
-                <Package size={24} style={{ marginBottom: '1rem', opacity: 0.3 }} />
-                <p style={{ fontSize: '12px' }}>Nenhum pedido em rota ativa.</p>
+              <div className="card-premium" style={{ textAlign: 'center', padding: '2rem', opacity: 0.5, borderStyle: 'dashed' }}>
+                <Package size={20} style={{ marginBottom: '0.5rem', opacity: 0.3 }} />
+                <p style={{ fontSize: '11px' }}>Nenhuma entrega em rota no momento.</p>
               </div>
             ) : (
               myDeliveries.map(delivery => (
                 <div key={delivery.id} className="card-premium animate-entrance" style={{ borderLeft: '4px solid var(--accent)' }}>
-                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
-                     <span style={{ fontSize: '10px', background: 'rgba(57, 255, 20, 0.1)', color: 'var(--accent)', padding: '0.2rem 0.5rem', borderRadius: '4px', fontWeight: 900 }}>#{delivery.orderNumber}</span>
-                     <p style={{ fontWeight: 800, color: 'var(--success)' }}>R$ {delivery.totalAmount.toFixed(2)}</p>
+                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.8rem' }}>
+                     <span style={{ fontSize: '9px', background: 'rgba(57, 255, 20, 0.1)', color: 'var(--accent)', padding: '0.2rem 0.5rem', borderRadius: '4px', fontWeight: 900 }}>#{delivery.orderNumber}</span>
+                     <p style={{ fontWeight: 800, color: 'var(--success)', fontSize: '0.9rem' }}>R$ {delivery.totalAmount?.toFixed(2)}</p>
                    </div>
-                   <p style={{ fontSize: '1.2rem', fontWeight: 800, marginBottom: '0.5rem' }}>{delivery.customerName}</p>
-                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
+                   <p style={{ fontSize: '1.1rem', fontWeight: 800, marginBottom: '0.4rem' }}>{delivery.customerName}</p>
+                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '1.2rem' }}>
                       <MapPin size={14} /> {delivery.address}
                    </div>
-                   {delivery.observations && (
-                      <div style={{ background: 'rgba(255,255,255,0.03)', padding: '0.8rem', borderRadius: '8px', marginBottom: '1.5rem', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                        <strong>Nota:</strong> {delivery.observations}
-                      </div>
-                   )}
-                   <button onClick={() => handleStatusUpdate(delivery.id, 'ENTREGUE')} className="btn-main" style={{ width: '100%', background: 'var(--success)', border: 'none', height: '60px' }}>
-                     <CheckCircle size={24} /> Confirmar Entrega
+                   <button onClick={() => handleStatusUpdate(delivery.id, 'ENTREGUE')} className="btn-main" style={{ width: '100%', background: 'var(--success)', border: 'none', height: '50px', fontSize: '0.9rem' }}>
+                     <CheckCircle size={20} /> Confirmar Entrega
                    </button>
                 </div>
               ))
@@ -219,22 +217,47 @@ export default function DriverApp() {
           </div>
         </div>
 
-        <div>
-          <h3 style={{ fontSize: '0.9rem', color: 'var(--primary)', fontWeight: 900, textTransform: 'uppercase', marginBottom: '1rem', letterSpacing: '0.2em' }}>Pendentes no Comando</h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
-            {availableDeliveries.map(delivery => (
-              <div key={delivery.id} className="card-premium" style={{ padding: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                  <p style={{ fontWeight: 800 }}>{delivery.customerName}</p>
-                  <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{delivery.address.slice(0, 30)}...</p>
+        {finishedDeliveries.length > 0 && (
+          <div>
+            <h3 style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 900, textTransform: 'uppercase', marginBottom: '1rem', letterSpacing: '0.2em', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <CheckCircle size={14} /> Histórico de Hoje
+            </h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+              {finishedDeliveries.map(delivery => (
+                <div key={delivery.id} className="card-premium" style={{ padding: '0.8rem 1.2rem', opacity: 0.7, background: 'rgba(57, 255, 20, 0.02)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <p style={{ fontWeight: 700, fontSize: '0.9rem' }}>{delivery.customerName}</p>
+                      <p style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{delivery.orderNumber} • Finalizado às {new Date(delivery.deliveredAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
+                    </div>
+                    <p style={{ fontWeight: 800, color: 'var(--text-muted)', fontSize: '0.9rem' }}>R$ {delivery.totalAmount?.toFixed(2)}</p>
+                  </div>
                 </div>
-                <button onClick={() => handleStatusUpdate(delivery.id, 'EM ROTA')} className="btn-outline" style={{ borderColor: 'var(--primary)', color: 'var(--primary)' }}>
-                  Assumir
-                </button>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
+        )}
+
+        {availableDeliveries.length > 0 && (
+          <div>
+            <h3 style={{ fontSize: '0.8rem', color: 'var(--primary)', fontWeight: 900, textTransform: 'uppercase', marginBottom: '1rem', letterSpacing: '0.2em', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Package size={14} /> Pedidos Disponíveis
+            </h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+              {availableDeliveries.map(delivery => (
+                <div key={delivery.id} className="card-premium" style={{ padding: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <p style={{ fontWeight: 800, fontSize: '0.9rem' }}>{delivery.customerName}</p>
+                    <p style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{delivery.address.slice(0, 35)}...</p>
+                  </div>
+                  <button onClick={() => handleStatusUpdate(delivery.id, 'EM ROTA')} className="btn-outline" style={{ borderColor: 'var(--primary)', color: 'var(--primary)', padding: '0.4rem 0.8rem', fontSize: '11px' }}>
+                    Assumir
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       <style jsx>{`
