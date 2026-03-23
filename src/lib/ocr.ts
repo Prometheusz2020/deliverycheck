@@ -34,9 +34,7 @@ export async function processReceipt(imageBufferOrUrl: string | File) {
 
     const totalMatch = 
       text.match(/Total\s*a\s*pagar\s*R?\$?\s*([\d\.\,]+)/i) || 
-      text.match(/Total\s*pagar\s*R?\$?\s*([\d\.\,]+)/i) || 
-      text.match(/Total\s*R?\$?\s*([\d\.\,]+)/i) ||
-      text.match(/A\s*pagar\s*R?\$?\s*([\d\.\,]+)/i);
+      text.match(/Total\s*pagar\s*R?\$?\s*([\d\.\,]+)/i);
     
     let totalAmount = 0;
     if (totalMatch) {
