@@ -11,8 +11,14 @@ export async function processReceipt(imageBufferOrUrl: string | File) {
     console.log("OCR Result RAW:", text);
 
     // Regex processing - More robust and explicit for requested fields
-    const orderMatch = text.match(/Delivery\s*#\s*(\d+)/i) || text.match(/DELIVERY\s*#\s*(\d+)/i) || text.match(/#\s*(\d+)/);
-    const orderNumber = orderMatch ? orderMatch[1] : `ORD-${Date.now().toString().slice(-4)}`;
+    const orderMatch = 
+      text.match(/Delivery\s*[#H+N]\s*(\d+)/i) || 
+      text.match(/DELIVERY\s*[#H+N]\s*(\d+)/i) || 
+      text.match(/Delivery\s*(\d+)/i) ||
+      text.match(/#\s*(\d+)/) ||
+      text.match(/Pedido\s*#?\s*(\d+)/i);
+    
+    const orderNumber = orderMatch ? orderMatch[1] : `ID-${Date.now().toString().slice(-4)}`;
 
     const addressMatch = text.match(/End:\s*(.*)/i);
     const address = addressMatch ? addressMatch[1].trim() : "Não detectado";
