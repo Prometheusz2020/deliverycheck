@@ -32,7 +32,12 @@ export async function processReceipt(imageBufferOrUrl: string | File) {
       deliveryFee = parseFloat(feeMatch[1].replace(',', '.'));
     }
 
-    const totalMatch = text.match(/Total a pagar\s*R?\$?\s*([\d\.\,]+)/i) || text.match(/Total.*?([\d\.\,]+)/i);
+    const totalMatch = 
+      text.match(/Total\s*a\s*pagar\s*R?\$?\s*([\d\.\,]+)/i) || 
+      text.match(/Total\s*pagar\s*R?\$?\s*([\d\.\,]+)/i) || 
+      text.match(/Total\s*R?\$?\s*([\d\.\,]+)/i) ||
+      text.match(/A\s*pagar\s*R?\$?\s*([\d\.\,]+)/i);
+    
     let totalAmount = 0;
     if (totalMatch) {
       totalAmount = parseFloat(totalMatch[1].replace(',', '.'));
