@@ -77,27 +77,47 @@ export default function DriverApp() {
     setDriver(null);
   };
 
+  const [scannedData, setScannedData] = useState<any>(null);
+  const [manualOrderNumber, setManualOrderNumber] = useState("");
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files?.[0] || !driver) return;
     setIsScanning(true);
     try {
       const data = await processReceipt(e.target.files[0]);
       if (data) {
-        const actions = await import("@/lib/actions");
-        await actions.addDelivery({
-          ...data,
-          driverId: driver.id,
-          deliveryPerson: driver.name,
-          status: 'EM ROTA'
-        });
-        fetchData();
+        setScannedData(data);
+        // Tenta pré-preencher com o que o OCR achou, se achou algo numérico
+        const ocrNum = data.orderNumber.match(/\d+/);
+        setManualOrderNumber(ocrNum ? ocrNum[0] : "");
       } else {
         alert("Não foi possível processar a imagem. Tente novamente.");
       }
     } catch (err) {
       alert("Erro no processamento da imagem.");
     }
-    setIsScanning(true);
+    setIsScanning(false);
+  };
+
+  const handleConfirmDelivery = async () => {
+    if (!scannedData || !driver || !manualOrderNumber) return;
+    setIsLoggingIn(true); // Reuso do loading state ou criar um novo
+    try {
+      const actions = await import("@/lib/actions");
+      await actions.addDelivery({
+        ...scannedData,
+        orderNumber: `#${manualOrderNumber}`, // Inclui o # conforme solicitado
+        driverId: driver.id,
+        deliveryPerson: driver.name,
+        status: 'EM ROTA'
+      });
+      setScannedData(null);
+      setManualOrderNumber("");
+      fetchData();
+    } catch (err) {
+      alert("Erro ao salvar entrega.");
+    }
+    setIsLoggingIn(false);
   };
 
   const handleStatusUpdate = async (id: string, status: any) => {
@@ -178,10 +198,35 @@ export default function DriverApp() {
         </button>
       </header>
 
+      {scannedData && (
+        <div className="card-premium animate-entrance" style={{ marginBottom: '1.5rem', border: '2px solid var(--primary)', padding: '1.5rem' }}>
+          <h3 style={{ fontSize: '0.9rem', marginBottom: '1rem', color: 'var(--primary)' }}>CONFIRMAR NÚMERO</h3>
+          <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '1rem' }}>
+            Detector: {scannedData.customerName} em {scannedData.address}
+          </p>
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            <span style={{ fontSize: '1.5rem', fontWeight: 800 }}>#</span>
+            <input 
+              type="number" 
+              value={manualOrderNumber} 
+              onChange={e => setManualOrderNumber(e.target.value)}
+              className="input-premium"
+              style={{ fontSize: '1.5rem', fontWeight: 800, textAlign: 'left' }}
+              placeholder="000"
+              autoFocus
+            />
+          </div>
+          <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem' }}>
+            <button onClick={() => setScannedData(null)} className="btn-outline" style={{ flex: 1 }}>Cancelar</button>
+            <button onClick={handleConfirmDelivery} className="btn-main" style={{ flex: 2 }}>Confirmar #</button>
+          </div>
+        </div>
+      )}
+
       <div style={{ marginBottom: '1.5rem' }}>
-        <label className="btn-main" style={{ cursor: 'pointer', height: '100px', flexDirection: 'column', gap: '0.5rem', fontSize: '1.1rem', background: 'linear-gradient(135deg, var(--primary), #0076fe)', color: '#fff', border: 'none' }}>
+        <label className="btn-main" style={{ cursor: 'pointer', height: '100px', flexDirection: 'column', gap: '0.5rem', fontSize: '1.1rem', background: 'linear-gradient(135deg, var(--primary), #0076fe)', color: '#fff', border: 'none', opacity: scannedData ? 0.5 : 1 }}>
           {isScanning ? <Loader2 size={32} className="spin" /> : <Camera size={32} />}
-          <span>Escanear Novo Pedido</span>
+          <span>{scannedData ? "Trocar Imagem" : "Escanear Novo Pedido"}</span>
           <input type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={handleFileUpload} />
         </label>
       </div>
@@ -202,7 +247,6 @@ export default function DriverApp() {
                 <div key={delivery.id} className="card-premium animate-entrance" style={{ borderLeft: '4px solid var(--accent)' }}>
                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.8rem' }}>
                      <span style={{ fontSize: '9px', background: 'rgba(57, 255, 20, 0.1)', color: 'var(--accent)', padding: '0.2rem 0.5rem', borderRadius: '4px', fontWeight: 900 }}>#{delivery.orderNumber}</span>
-                     <p style={{ fontWeight: 800, color: 'var(--success)', fontSize: '0.9rem' }}>R$ {delivery.totalAmount?.toFixed(2)}</p>
                    </div>
                    <p style={{ fontSize: '1.1rem', fontWeight: 800, marginBottom: '0.4rem' }}>{delivery.customerName}</p>
                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '1.2rem' }}>
@@ -230,7 +274,7 @@ export default function DriverApp() {
                       <p style={{ fontWeight: 700, fontSize: '0.9rem' }}>{delivery.customerName}</p>
                       <p style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{delivery.orderNumber} • Finalizado às {new Date(delivery.deliveredAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
                     </div>
-                    <p style={{ fontWeight: 800, color: 'var(--text-muted)', fontSize: '0.9rem' }}>R$ {delivery.totalAmount?.toFixed(2)}</p>
+                    <p style={{ fontWeight: 800, color: 'var(--text-muted)', fontSize: '0.9rem' }}>Finalizado às {new Date(delivery.deliveredAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
                   </div>
                 </div>
               ))}
