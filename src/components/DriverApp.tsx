@@ -7,7 +7,7 @@ import {
 } from "@/lib/auth-actions";
 import { 
   Camera, CheckCircle, MapPin, User, LogOut, 
-  Package, Zap, Loader2, ArrowRight, ShieldCheck 
+  Package, Zap, Loader2, ArrowRight, ShieldCheck, MessageSquare 
 } from "lucide-react";
 
 export default function DriverApp() {
@@ -249,9 +249,15 @@ export default function DriverApp() {
                      <span style={{ fontSize: '9px', background: 'rgba(57, 255, 20, 0.1)', color: 'var(--accent)', padding: '0.2rem 0.5rem', borderRadius: '4px', fontWeight: 900 }}>{delivery.orderNumber}</span>
                    </div>
                    <p style={{ fontSize: '1.1rem', fontWeight: 800, marginBottom: '0.4rem' }}>{delivery.customerName}</p>
-                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '1.2rem' }}>
+                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '0.8rem' }}>
                       <MapPin size={14} /> {delivery.address}
                    </div>
+                    {delivery.observations && (
+                      <div style={{ background: 'rgba(57, 255, 20, 0.05)', padding: '0.8rem', borderRadius: '12px', border: '1px solid rgba(57, 255, 20, 0.1)', marginBottom: '1.2rem', fontSize: '0.8rem', color: 'var(--accent)', fontWeight: 600 }}>
+                        <MessageSquare size={14} style={{ marginRight: '6px', verticalAlign: 'middle' }} />
+                        {delivery.observations}
+                      </div>
+                    )}
                    <button onClick={() => handleStatusUpdate(delivery.id, 'ENTREGUE')} className="btn-main" style={{ width: '100%', background: 'var(--success)', border: 'none', height: '50px', fontSize: '0.9rem' }}>
                      <CheckCircle size={20} /> Confirmar Entrega
                    </button>

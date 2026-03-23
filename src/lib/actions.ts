@@ -92,6 +92,12 @@ export async function reassignDelivery(deliveryId: string, newDriverId: string) 
   revalidatePath("/driver");
 }
 
+export async function deleteDelivery(id: string) {
+  await prisma.delivery.delete({ where: { id } });
+  revalidatePath("/restaurant");
+  revalidatePath("/driver");
+}
+
 export async function clearDeliveries() {
   await prisma.delivery.deleteMany();
   await prisma.driver.updateMany({

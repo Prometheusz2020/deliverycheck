@@ -145,17 +145,31 @@ export default function RestaurantPortal() {
                           <p style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{delivery.address}</p>
                         </td>
                         <td>
-                          <select 
-                            onChange={(e) => handleTransfer(delivery.id, e.target.value)}
-                            className="input-premium"
-                            style={{ padding: '0.2rem', fontSize: '10px' }}
-                            value={delivery.driverId || ""}
-                          >
-                            <option value="">Enviar para...</option>
-                            {drivers.map(dr => (
-                              <option key={dr.id} value={dr.id}>{dr.name}</option>
-                            ))}
-                          </select>
+                          <div style={{ display: 'flex', gap: '8px' }}>
+                            <select 
+                              onChange={(e) => handleTransfer(delivery.id, e.target.value)}
+                              className="input-premium"
+                              style={{ padding: '0.2rem', fontSize: '10px', flex: 1 }}
+                              value={delivery.driverId || ""}
+                            >
+                              <option value="">Enviar para...</option>
+                              {drivers.map(dr => (
+                                <option key={dr.id} value={dr.id}>{dr.name}</option>
+                              ))}
+                            </select>
+                            <button 
+                              onClick={async () => {
+                                if(confirm("Excluir pedido?")) {
+                                  const actions = await import("@/lib/actions");
+                                  await actions.deleteDelivery(delivery.id);
+                                  fetchData();
+                                }
+                              }}
+                              style={{ padding: '0.4rem', background: 'rgba(255,45,85,0.1)', border: 'none', borderRadius: '4px', color: 'var(--danger)' }}
+                            >
+                              <LogOut size={14} style={{ transform: 'rotate(180deg)' }} />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -173,7 +187,7 @@ export default function RestaurantPortal() {
             return (
               <div key={driver.id} className="card-premium" style={{ borderTop: '4px solid var(--primary)' }}>
                 <h3 style={{ marginBottom: '1rem', color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <MapPin size={16} /> {driver.name.toUpperCase()} (EM ROTA)
+                  <MapPin size={16} /> {driver.name.toUpperCase()}
                 </h3>
                 <div className="table-wrapper">
                   <table className="table-premium">
@@ -181,8 +195,8 @@ export default function RestaurantPortal() {
                       <tr>
                         <th>Cód</th>
                         <th>Cliente</th>
-                        <th>Status</th>
-                        <th>Trocar</th>
+                        <th>Obs / Notas</th>
+                        <th>Ações</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -191,24 +205,42 @@ export default function RestaurantPortal() {
                           <td style={{ fontWeight: 800 }}>{delivery.orderNumber}</td>
                           <td>
                             <p>{delivery.customerName}</p>
-                            <p style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{delivery.address}</p>
-                          </td>
-                          <td style={{ textAlign: 'center' }}>
-                            <span className={`status ${delivery.status === 'EM ROTA' ? 'status-route' : 'status-pending'}`}>
-                              {delivery.status}
-                            </span>
                           </td>
                           <td>
-                            <select 
-                              onChange={(e) => handleTransfer(delivery.id, e.target.value)}
+                            <input 
+                              type="text" 
+                              placeholder="Add nota..." 
+                              defaultValue={delivery.observations || ""}
+                              onBlur={(e) => handleObs(delivery.id, e.target.value)}
                               className="input-premium"
-                              style={{ padding: '0.2rem', fontSize: '10px' }}
-                              value={delivery.driverId || ""}
-                            >
-                              {drivers.map(dr => (
-                                <option key={dr.id} value={dr.id}>{dr.name}</option>
-                              ))}
-                            </select>
+                              style={{ fontSize: '10px', padding: '0.3rem' }}
+                            />
+                          </td>
+                          <td>
+                            <div style={{ display: 'flex', gap: '6px' }}>
+                              <select 
+                                onChange={(e) => handleTransfer(delivery.id, e.target.value)}
+                                className="input-premium"
+                                style={{ padding: '0.2rem', fontSize: '10px' }}
+                                value={delivery.driverId || ""}
+                              >
+                                {drivers.map(dr => (
+                                  <option key={dr.id} value={dr.id}>{dr.name}</option>
+                                ))}
+                              </select>
+                              <button 
+                                onClick={async () => {
+                                  if(confirm("Excluir pedido?")) {
+                                    const actions = await import("@/lib/actions");
+                                    await actions.deleteDelivery(delivery.id);
+                                    fetchData();
+                                  }
+                                }}
+                                style={{ padding: '0.4rem', background: 'rgba(255,45,85,0.1)', border: 'none', borderRadius: '4px', color: 'var(--danger)' }}
+                              >
+                                <LogOut size={14} style={{ transform: 'rotate(180deg)' }} />
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))}
