@@ -33,3 +33,11 @@ model Delivery {
   observations   String?
   updatedAt      DateTime  @updatedAt
 }
+
+model Admin {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  password  String   @default("123")
+  createdAt DateTime @default(now())
+}

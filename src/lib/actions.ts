@@ -119,9 +119,9 @@ export async function getSummary() {
   ]);
 
   const stats = {
-    pending: counts.find((c: any) => c.status === "PENDENTE")?._count._all || 0,
-    onRoute: counts.find((c: any) => c.status === "EM ROTA")?._count._all || 0,
-    delivered: counts.find((c: any) => c.status === "ENTREGUE")?._count._all || 0,
+    pending: counts.find((c) => c.status === "PENDENTE")?._count._all || 0,
+    onRoute: counts.find((c) => c.status === "EM ROTA")?._count._all || 0,
+    delivered: counts.find((c) => c.status === "ENTREGUE")?._count._all || 0,
     totalValue: sums._sum.totalAmount || 0,
     totalFees: sums._sum.deliveryFee || 0
   };
@@ -154,12 +154,29 @@ export async function getSessionDriver() {
 }
 
 // ADMIN ACTIONS
-export async function loginAdmin(password: string) {
-  if (password === process.env.ADMIN_PASSWORD || password === "admin_pratali") {
+export async function loginAdmin(emailOrPass: string, password?: string) {
+  // Check master password (for legacy single input)
+  if (!password) {
+    if (emailOrPass === process.env.ADMIN_PASSWORD || emailOrPass === "admin_pratali") {
+      const cookieStore = await cookies();
+      cookieStore.set("admin_session", "true", { path: "/", maxAge: 60 * 60 * 8 });
+      return { success: true };
+    }
+    return { success: false };
+  }
+
+  // Check individual admin login
+  const admin = await prisma.admin.findUnique({
+    where: { email: emailOrPass }
+  });
+
+  if (admin && admin.password === password) {
     const cookieStore = await cookies();
-    cookieStore.set("admin_session", "true", { path: "/", maxAge: 60 * 60 * 8 }); // 8 hours
+    cookieStore.set("admin_session", "true", { path: "/", maxAge: 60 * 60 * 8 });
+    cookieStore.set("admin_name", admin.name, { path: "/", maxAge: 60 * 60 * 8 });
     return { success: true };
   }
+  
   return { success: false };
 }
 

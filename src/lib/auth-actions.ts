@@ -8,13 +8,31 @@ export async function getSessionAdmin() {
   return cookieStore.get("admin_session")?.value === "true";
 }
 
-export async function loginAdmin(password: string) {
-  // Chave mestra simples configurada no .env ou hardcoded para emergência
-  if (password === process.env.ADMIN_PASSWORD || password === "admin_pratali") {
+import { prisma } from "./db";
+
+export async function loginAdmin(emailOrPass: string, password?: string) {
+  // Check master password (for legacy single input)
+  if (!password) {
+    if (emailOrPass === process.env.ADMIN_PASSWORD || emailOrPass === "admin_pratali") {
+      const cookieStore = await cookies();
+      cookieStore.set("admin_session", "true", { path: "/", maxAge: 60 * 60 * 8 });
+      return { success: true };
+    }
+    return { success: false };
+  }
+
+  // Check individual admin login
+  const admin = await prisma.admin.findUnique({
+    where: { email: emailOrPass }
+  });
+
+  if (admin && admin.password === password) {
     const cookieStore = await cookies();
-    cookieStore.set("admin_session", "true", { path: "/", maxAge: 60 * 60 * 8 }); // 8 hours
+    cookieStore.set("admin_session", "true", { path: "/", maxAge: 60 * 60 * 8 });
+    cookieStore.set("admin_name", admin.name, { path: "/", maxAge: 60 * 60 * 8 });
     return { success: true };
   }
+  
   return { success: false };
 }
 
