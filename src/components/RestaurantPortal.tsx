@@ -72,6 +72,13 @@ export default function RestaurantPortal() {
     setDeliveries(prev => prev.map(d => d.id === id ? { ...d, observations: text } : d));
   };
 
+  const handleClearDeliveries = async () => {
+    if (!confirm("TEM CERTEZA QUE DESEJA APAGAR TODAS AS ENTREGAS? Isso não pode ser desfeito.")) return;
+    const actions = await import("@/lib/actions");
+    await actions.clearDeliveries();
+    fetchData();
+  };
+
   return (
     <div className="page-container animate-entrance" style={{ marginTop: '2rem' }}>
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '2rem' }}>
@@ -88,7 +95,10 @@ export default function RestaurantPortal() {
               <Users size={16} /> Motoristas
             </button>
           </div>
-          <button onClick={handleAdminLogout} style={{ padding: '0.8rem', background: 'rgba(255,45,85,0.05)', border: '1px solid rgba(255,45,85,0.1)', color: 'var(--danger)', borderRadius: '12px', cursor: 'pointer' }}>
+          <button onClick={handleClearDeliveries} style={{ padding: '0.8rem', background: 'rgba(255,45,85,0.05)', border: '1px solid rgba(255,45,85,0.1)', color: 'var(--danger)', borderRadius: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', fontWeight: 700 }}>
+            <ClipboardList size={18} /> LIMPAR TUDO
+          </button>
+          <button onClick={handleAdminLogout} style={{ padding: '0.8rem', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-muted)', borderRadius: '12px', cursor: 'pointer' }}>
             <LogOut size={18} />
           </button>
         </div>
