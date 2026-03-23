@@ -126,7 +126,7 @@ export default function RestaurantPortal() {
             <tbody>
               {deliveries.map(delivery => (
                 <tr key={delivery.id}>
-                  <td style={{ color: 'var(--primary)', fontWeight: 800 }}>#{delivery.orderNumber}</td>
+                  <td style={{ color: 'var(--primary)', fontWeight: 800 }}>{delivery.orderNumber}</td>
                   <td>
                     <p>{delivery.customerName}</p>
                     <p style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{delivery.address}</p>

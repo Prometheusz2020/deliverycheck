@@ -246,7 +246,7 @@ export default function DriverApp() {
               myDeliveries.map(delivery => (
                 <div key={delivery.id} className="card-premium animate-entrance" style={{ borderLeft: '4px solid var(--accent)' }}>
                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.8rem' }}>
-                     <span style={{ fontSize: '9px', background: 'rgba(57, 255, 20, 0.1)', color: 'var(--accent)', padding: '0.2rem 0.5rem', borderRadius: '4px', fontWeight: 900 }}>#{delivery.orderNumber}</span>
+                     <span style={{ fontSize: '9px', background: 'rgba(57, 255, 20, 0.1)', color: 'var(--accent)', padding: '0.2rem 0.5rem', borderRadius: '4px', fontWeight: 900 }}>{delivery.orderNumber}</span>
                    </div>
                    <p style={{ fontSize: '1.1rem', fontWeight: 800, marginBottom: '0.4rem' }}>{delivery.customerName}</p>
                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '1.2rem' }}>
