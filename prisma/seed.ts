@@ -7,6 +7,7 @@ async function main() {
   console.log('Seeding data...')
 
   // Clear existing
+  await prisma.delivery.deleteMany()
   await prisma.admin.deleteMany()
   await prisma.driver.deleteMany()
 

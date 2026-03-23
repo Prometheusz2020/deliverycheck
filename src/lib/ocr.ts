@@ -36,7 +36,8 @@ export async function processReceipt(imageBufferOrUrl: string | File) {
     const feeMatch = text.match(/Taxa entrega\s*R?\$?\s*([\d\.\,]+)/i) || text.match(/Taxa\s+entrega.*?([\d\.\,]+)/i);
     let deliveryFee = 0;
     if (feeMatch) {
-      deliveryFee = parseFloat(feeMatch[1].replace(',', '.'));
+      const val = parseFloat(feeMatch[1].replace(',', '.'));
+      deliveryFee = isNaN(val) ? 0 : val;
     }
 
     // Total a pagar removido temporariamente conforme solicitado
@@ -49,8 +50,8 @@ export async function processReceipt(imageBufferOrUrl: string | File) {
       orderNumber,
       address,
       customerName: customer,
-      totalAmount,
-      deliveryFee,
+      totalAmount: (!isNaN(totalAmount)) ? totalAmount : 0,
+      deliveryFee: (!isNaN(deliveryFee)) ? deliveryFee : 0,
       paymentMethod
     };
   } catch (err) {
