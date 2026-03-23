@@ -6,7 +6,7 @@ import { Delivery, DeliverySummary, Driver } from "@/lib/types";
 import { 
   Clock, UserPlus, MessageSquare, DollarSign, Loader2, 
   BarChart2, Users, ClipboardList, TrendingUp, MapPin, 
-  Briefcase, LogOut 
+  Briefcase, LogOut, Package
 } from "lucide-react";
 
 export default function RestaurantPortal() {
@@ -112,48 +112,125 @@ export default function RestaurantPortal() {
       </div>
 
       {activeTab === 'deliveries' ? (
-        <div className="table-wrapper">
-          <table className="table-premium">
-            <thead>
-              <tr>
-                <th>Cód</th>
-                <th>Cliente</th>
-                <th>Valor</th>
-                <th>Entregador</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {deliveries.map(delivery => (
-                <tr key={delivery.id}>
-                  <td style={{ color: 'var(--primary)', fontWeight: 800 }}>{delivery.orderNumber}</td>
-                  <td>
-                    <p>{delivery.customerName}</p>
-                    <p style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{delivery.address}</p>
-                  </td>
-                  <td style={{ fontWeight: 800 }}>R$ {delivery.totalAmount?.toFixed(2)}</td>
-                  <td>
-                    <select 
-                      onChange={(e) => handleTransfer(delivery.id, e.target.value)}
-                      className="input-premium"
-                      style={{ padding: '0.2rem', fontSize: '10px' }}
-                      value={delivery.driverId || ""}
-                    >
-                      <option value="">{delivery.deliveryPerson || "Selecionar..."}</option>
-                      {drivers.map(dr => (
-                        <option key={dr.id} value={dr.id}>{dr.name}</option>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+          {/* Unassigned Deliveries First */}
+          {deliveries.filter(d => !d.driverId).length > 0 && (
+            <div className="card-premium" style={{ borderTop: '4px solid var(--warning)' }}>
+              <h3 style={{ marginBottom: '1rem', color: 'var(--warning)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Clock size={16} /> AGUARDANDO ATRIBUIÇÃO
+              </h3>
+              <div className="table-wrapper">
+                <table className="table-premium">
+                  <thead>
+                    <tr>
+                      <th>Cód</th>
+                      <th>Cliente</th>
+                      <th>Ação</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {deliveries.filter(d => !d.driverId).map(delivery => (
+                      <tr key={delivery.id}>
+                        <td style={{ color: 'var(--primary)', fontWeight: 800 }}>{delivery.orderNumber}</td>
+                        <td>
+                          <p>{delivery.customerName}</p>
+                          <p style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{delivery.address}</p>
+                        </td>
+                        <td>
+                          <select 
+                            onChange={(e) => handleTransfer(delivery.id, e.target.value)}
+                            className="input-premium"
+                            style={{ padding: '0.2rem', fontSize: '10px' }}
+                            value={delivery.driverId || ""}
+                          >
+                            <option value="">Enviar para...</option>
+                            {drivers.map(dr => (
+                              <option key={dr.id} value={dr.id}>{dr.name}</option>
+                            ))}
+                          </select>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Grouped by Active Driver */}
+          {drivers.map(driver => {
+            const driverDeliveries = deliveries.filter(d => d.driverId === driver.id && d.status !== 'ENTREGUE');
+            if (driverDeliveries.length === 0) return null;
+            
+            return (
+              <div key={driver.id} className="card-premium" style={{ borderTop: '4px solid var(--primary)' }}>
+                <h3 style={{ marginBottom: '1rem', color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <MapPin size={16} /> {driver.name.toUpperCase()} (EM ROTA)
+                </h3>
+                <div className="table-wrapper">
+                  <table className="table-premium">
+                    <thead>
+                      <tr>
+                        <th>Cód</th>
+                        <th>Cliente</th>
+                        <th>Status</th>
+                        <th>Trocar</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {driverDeliveries.map(delivery => (
+                        <tr key={delivery.id}>
+                          <td style={{ fontWeight: 800 }}>{delivery.orderNumber}</td>
+                          <td>
+                            <p>{delivery.customerName}</p>
+                            <p style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{delivery.address}</p>
+                          </td>
+                          <td style={{ textAlign: 'center' }}>
+                            <span className={`status ${delivery.status === 'EM ROTA' ? 'status-route' : 'status-pending'}`}>
+                              {delivery.status}
+                            </span>
+                          </td>
+                          <td>
+                            <select 
+                              onChange={(e) => handleTransfer(delivery.id, e.target.value)}
+                              className="input-premium"
+                              style={{ padding: '0.2rem', fontSize: '10px' }}
+                              value={delivery.driverId || ""}
+                            >
+                              {drivers.map(dr => (
+                                <option key={dr.id} value={dr.id}>{dr.name}</option>
+                              ))}
+                            </select>
+                          </td>
+                        </tr>
                       ))}
-                    </select>
-                  </td>
-                  <td style={{ textAlign: 'center' }}>
-                    <span className={`status ${delivery.status === 'PENDENTE' ? 'status-pending' : delivery.status === 'EM ROTA' ? 'status-route' : 'status-delivered'}`}>
-                      {delivery.status}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            );
+          })}
+
+          {/* Show Recent Finished */}
+          <div className="card-premium" style={{ opacity: 0.8 }}>
+            <h3 style={{ marginBottom: '1rem', color: 'var(--success)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Package size={16} /> FINALIZADAS RECENTEMENTE
+            </h3>
+            <div className="table-wrapper">
+                <table className="table-premium">
+                  <tbody>
+                    {deliveries.filter(d => d.status === 'ENTREGUE').slice(0, 10).map(delivery => (
+                      <tr key={delivery.id}>
+                        <td>{delivery.orderNumber}</td>
+                        <td>{delivery.customerName}</td>
+                        <td style={{ color: 'var(--text-muted)', fontSize: '11px' }}>por {delivery.deliveryPerson}</td>
+                        <td style={{ color: 'var(--success)', fontWeight: 800 }}>ENTREGUE</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+            </div>
+          </div>
         </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: '2rem' }}>
