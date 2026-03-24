@@ -1,19 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { processReceipt } from "@/lib/ocr";
 import { 
   getSessionDriver, logoutAdmin 
 } from "@/lib/auth-actions";
 import { 
-  Camera, CheckCircle, MapPin, User, LogOut, 
+  CheckCircle, MapPin, User, LogOut, 
   Package, Zap, Loader2, ArrowRight, ShieldCheck, MessageSquare 
 } from "lucide-react";
 
 export default function DriverApp() {
   const [driver, setDriver] = useState<{ id: string; name: string } | null>(null);
   const [deliveries, setDeliveries] = useState<any[]>([]);
-  const [isScanning, setIsScanning] = useState(false);
   
   // Login State
   const [loginName, setLoginName] = useState("");
@@ -77,45 +75,26 @@ export default function DriverApp() {
     setDriver(null);
   };
 
-  const [scannedData, setScannedData] = useState<any>(null);
   const [manualOrderNumber, setManualOrderNumber] = useState("");
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files?.[0] || !driver) return;
-    setIsScanning(true);
-    try {
-      const data = await processReceipt(e.target.files[0]);
-      if (data) {
-        setScannedData(data);
-        // Tenta pré-preencher com o que o OCR achou, se achou algo numérico
-        const ocrNum = data.orderNumber.match(/\d+/);
-        setManualOrderNumber(ocrNum ? ocrNum[0] : "");
-      } else {
-        alert("Não foi possível processar a imagem. Tente novamente.");
-      }
-    } catch (err) {
-      alert("Erro no processamento da imagem.");
-    }
-    setIsScanning(false);
-  };
-
-  const handleConfirmDelivery = async () => {
-    if (!scannedData || !driver || !manualOrderNumber) return;
-    setIsLoggingIn(true); // Reuso do loading state ou criar um novo
+  const handleRegisterDelivery = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!driver || !manualOrderNumber) return;
+    setIsLoggingIn(true); 
     try {
       const actions = await import("@/lib/actions");
       await actions.addDelivery({
-        ...scannedData,
         orderNumber: `#${manualOrderNumber}`, // Inclui o # conforme solicitado
+        customerName: "Pedido Avulso",
+        address: "Destino a definir",
         driverId: driver.id,
         deliveryPerson: driver.name,
         status: 'EM ROTA'
       });
-      setScannedData(null);
       setManualOrderNumber("");
       fetchData();
     } catch (err) {
-      alert("Erro ao salvar entrega.");
+      alert("Erro ao registrar entrega.");
     }
     setIsLoggingIn(false);
   };
@@ -198,37 +177,25 @@ export default function DriverApp() {
         </button>
       </header>
 
-      {scannedData && (
-        <div className="card-premium animate-entrance" style={{ marginBottom: '1.5rem', border: '2px solid var(--primary)', padding: '1.5rem' }}>
-          <h3 style={{ fontSize: '0.9rem', marginBottom: '1rem', color: 'var(--primary)' }}>CONFIRMAR NÚMERO</h3>
-          <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '1rem' }}>
-            Detector: {scannedData.customerName} em {scannedData.address}
-          </p>
-          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-            <span style={{ fontSize: '1.5rem', fontWeight: 800 }}>#</span>
+      <div className="card-premium animate-entrance" style={{ marginBottom: '1.5rem', padding: '1.5rem' }}>
+        <h3 style={{ fontSize: '0.9rem', marginBottom: '1rem', color: 'var(--accent)', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.1em' }}>REGISTRAR NOVO PEDIDO</h3>
+        <form onSubmit={handleRegisterDelivery} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', background: 'var(--surface-low)', padding: '0.5rem 1rem', borderRadius: '15px' }}>
+            <span style={{ fontSize: '1.8rem', fontWeight: 800, color: 'var(--accent)' }}>#</span>
             <input 
               type="number" 
               value={manualOrderNumber} 
               onChange={e => setManualOrderNumber(e.target.value)}
               className="input-premium"
-              style={{ fontSize: '1.5rem', fontWeight: 800, textAlign: 'left' }}
+              style={{ fontSize: '1.8rem', fontWeight: 800, textAlign: 'left', border: 'none', background: 'transparent', padding: '0.5rem' }}
               placeholder="000"
-              autoFocus
+              required
             />
           </div>
-          <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem' }}>
-            <button onClick={() => setScannedData(null)} className="btn-outline" style={{ flex: 1 }}>Cancelar</button>
-            <button onClick={handleConfirmDelivery} className="btn-main" style={{ flex: 2 }}>Confirmar #</button>
-          </div>
-        </div>
-      )}
-
-      <div style={{ marginBottom: '1.5rem' }}>
-        <label className="btn-main" style={{ cursor: 'pointer', height: '100px', flexDirection: 'column', gap: '0.5rem', fontSize: '1.1rem', background: 'linear-gradient(135deg, var(--primary), #0076fe)', color: '#fff', border: 'none', opacity: scannedData ? 0.5 : 1 }}>
-          {isScanning ? <Loader2 size={32} className="spin" /> : <Camera size={32} />}
-          <span>{scannedData ? "Trocar Imagem" : "Escanear Novo Pedido"}</span>
-          <input type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={handleFileUpload} />
-        </label>
+          <button type="submit" className="btn-main" style={{ width: '100%', background: 'linear-gradient(135deg, var(--primary), #0066ff)', color: '#fff', border: 'none', height: '55px', fontSize: '1.1rem' }}>
+            {isLoggingIn ? <Loader2 size={24} className="spin" /> : <><Package size={22} /> <span>Registrar Início</span></>}
+          </button>
+        </form>
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', paddingBottom: '3rem' }}>

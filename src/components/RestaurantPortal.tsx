@@ -6,7 +6,7 @@ import { Delivery, DeliverySummary, Driver } from "@/lib/types";
 import { 
   Clock, UserPlus, MessageSquare, DollarSign, Loader2, 
   BarChart2, Users, ClipboardList, TrendingUp, MapPin, 
-  Briefcase, LogOut, Package
+  Briefcase, LogOut, Package, User
 } from "lucide-react";
 
 export default function RestaurantPortal() {
@@ -285,12 +285,69 @@ export default function RestaurantPortal() {
             </div>
           </div>
           <div style={{ gridColumn: 'span 8' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
-              {drivers.map(dr => (
-                <div key={dr.id} className="card-premium">
-                  <p style={{ fontWeight: 800 }}>{dr.name}</p>
-                </div>
-              ))}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(1, 1fr)', gap: '1.5rem' }}>
+              {drivers.map(dr => {
+                const onRoute = deliveries.filter(d => d.driverId === dr.id && d.status === 'EM ROTA');
+                const delivered = deliveries.filter(d => d.driverId === dr.id && d.status === 'ENTREGUE');
+                const allDeliveries = deliveries.filter(d => d.driverId === dr.id);
+
+                return (
+                  <div key={dr.id} className="card-premium" style={{ padding: '1.5rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '1rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <div style={{ width: '45px', height: '45px', background: 'var(--accent)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#000' }}>
+                          <User size={24} />
+                        </div>
+                        <div>
+                          <p style={{ fontWeight: 800, fontSize: '1.2rem' }}>{dr.name.toUpperCase()}</p>
+                          <p style={{ fontSize: '10px', color: 'var(--accent)', fontWeight: 900, textTransform: 'uppercase' }}>Taxas: R$ {dr.totalFeesEarned.toFixed(2)}</p>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: '1rem' }}>
+                        <div style={{ textAlign: 'center' }}>
+                          <p style={{ fontSize: '11px', color: 'var(--primary)', fontWeight: 800 }}>{onRoute.length}</p>
+                          <p style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Em Rota</p>
+                        </div>
+                        <div style={{ textAlign: 'center' }}>
+                          <p style={{ fontSize: '11px', color: 'var(--success)', fontWeight: 800 }}>{delivered.length}</p>
+                          <p style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Entregues</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                      <p style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: 900, textTransform: 'uppercase', marginBottom: '4px' }}>Histórico Recente</p>
+                      {allDeliveries.length === 0 ? (
+                        <p style={{ fontSize: '11px', color: 'var(--text-muted)', opacity: 0.5 }}>Nenhum registro encontrado.</p>
+                      ) : (
+                        allDeliveries.slice(0, 5).map(delivery => (
+                          <div key={delivery.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.02)', padding: '0.6rem 1rem', borderRadius: '10px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                              <span style={{ fontSize: '11px', fontWeight: 800, color: delivery.status === 'ENTREGUE' ? 'var(--success)' : 'var(--primary)' }}>{delivery.orderNumber}</span>
+                              <span style={{ fontSize: '12px', fontWeight: 600 }}>{delivery.customerName}</span>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                               <span style={{ 
+                                 fontSize: '9px', 
+                                 fontWeight: 900, 
+                                 padding: '0.2rem 0.6rem', 
+                                 borderRadius: '4px',
+                                 background: delivery.status === 'ENTREGUE' ? 'rgba(52, 199, 89, 0.1)' : 'rgba(0, 122, 255, 0.1)',
+                                 color: delivery.status === 'ENTREGUE' ? 'var(--success)' : 'var(--primary)'
+                               }}>{delivery.status}</span>
+                               <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
+                                 {delivery.status === 'ENTREGUE' 
+                                   ? new Date(delivery.deliveredAt!).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+                                   : new Date(delivery.scannedAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                               </span>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
