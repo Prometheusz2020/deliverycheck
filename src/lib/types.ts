@@ -17,8 +17,8 @@ export interface Delivery {
   status: DeliveryStatus;
   driverId?: string;
   deliveryPerson?: string; // Current name of driver
-  scannedAt: string;
-  deliveredAt?: string;
+  scannedAt: Date | string;
+  deliveredAt?: Date | string;
   paymentMethod?: string;
   observations?: string;
 }

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { 
   getSessionDriver, logoutAdmin 
 } from "@/lib/auth-actions";
+import { Delivery, DeliveryStatus } from "@/lib/types";
 import { 
   CheckCircle, MapPin, User, LogOut, 
   Package, Zap, Loader2, ArrowRight, ShieldCheck, MessageSquare 
@@ -11,7 +12,7 @@ import {
 
 export default function DriverApp() {
   const [driver, setDriver] = useState<{ id: string; name: string } | null>(null);
-  const [deliveries, setDeliveries] = useState<any[]>([]);
+  const [deliveries, setDeliveries] = useState<Delivery[]>([]);
   
   // Login State
   const [loginName, setLoginName] = useState("");
@@ -21,8 +22,9 @@ export default function DriverApp() {
   const fetchData = async () => {
     try {
       const actions = await import("@/lib/actions");
-      const data = await actions.getDeliveries();
-      setDeliveries(data as any);
+      const today = new Date().toISOString().split('T')[0];
+      const data = await actions.getDeliveries(today);
+      setDeliveries(data as Delivery[]);
     } catch (err) {
       console.error("Driver Fetch Error:", err);
     }
@@ -38,7 +40,7 @@ export default function DriverApp() {
         } else {
           setDriver(null);
         }
-      } catch (err) {
+      } catch {
         setDriver(null);
       }
     };
@@ -64,7 +66,7 @@ export default function DriverApp() {
       } else {
         alert("Credenciais de motorista inválidas.");
       }
-    } catch (err) {
+    } catch {
       alert("Erro ao conectar com a central.");
     }
     setIsLoggingIn(false);
@@ -93,13 +95,13 @@ export default function DriverApp() {
       });
       setManualOrderNumber("");
       fetchData();
-    } catch (err) {
+    } catch {
       alert("Erro ao registrar entrega.");
     }
     setIsLoggingIn(false);
   };
 
-  const handleStatusUpdate = async (id: string, status: any) => {
+  const handleStatusUpdate = async (id: string, status: DeliveryStatus) => {
     const actions = await import("@/lib/actions");
     await actions.updateDeliveryStatus(id, status);
     fetchData();
@@ -245,9 +247,9 @@ export default function DriverApp() {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
                       <p style={{ fontWeight: 700, fontSize: '0.9rem' }}>{delivery.customerName}</p>
-                      <p style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{delivery.orderNumber} • Finalizado às {new Date(delivery.deliveredAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
+                      <p style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{delivery.orderNumber} • Finalizado às {delivery.deliveredAt ? new Date(delivery.deliveredAt!).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '--:--'}</p>
                     </div>
-                    <p style={{ fontWeight: 800, color: 'var(--text-muted)', fontSize: '0.9rem' }}>Finalizado às {new Date(delivery.deliveredAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
+                    <p style={{ fontWeight: 800, color: 'var(--text-muted)', fontSize: '0.9rem' }}>Finalizado às {delivery.deliveredAt ? new Date(delivery.deliveredAt!).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '--:--'}</p>
                   </div>
                 </div>
               ))}
@@ -265,7 +267,7 @@ export default function DriverApp() {
                 <div key={delivery.id} className="card-premium" style={{ padding: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
                     <p style={{ fontWeight: 800, fontSize: '0.9rem' }}>{delivery.customerName}</p>
-                    <p style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{delivery.address.slice(0, 35)}...</p>
+                    <p style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{(delivery.address || "").slice(0, 35)}...</p>
                   </div>
                   <button onClick={() => handleStatusUpdate(delivery.id, 'EM ROTA')} className="btn-outline" style={{ borderColor: 'var(--primary)', color: 'var(--primary)', padding: '0.4rem 0.8rem', fontSize: '11px' }}>
                     Assumir

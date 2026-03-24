@@ -20,14 +20,15 @@ export default function RestaurantPortal() {
   const [newDriverName, setNewDriverName] = useState("");
   const [newDriverPass, setNewDriverPass] = useState("");
   const [isAddingDriver, setIsAddingDriver] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
 
   const fetchData = useCallback(async () => {
     try {
       const actions = await import("@/lib/actions");
       const [d, dr, s] = await Promise.all([
-        actions.getDeliveries(), 
+        actions.getDeliveries(selectedDate), 
         actions.getDrivers(), 
-        actions.getSummary()
+        actions.getSummary(selectedDate)
       ]);
       setDeliveries(d as any);
       setDrivers(dr);
@@ -35,13 +36,13 @@ export default function RestaurantPortal() {
     } catch (err) {
       console.error("Portal Fetch Error:", err);
     }
-  }, []);
+  }, [selectedDate]);
 
   useEffect(() => {
     fetchData();
     const interval = setInterval(fetchData, 15000);
     return () => clearInterval(interval);
-  }, [fetchData]);
+  }, [fetchData, selectedDate]);
 
   const handleAdminLogout = async () => {
     await logoutAdmin();
@@ -72,12 +73,6 @@ export default function RestaurantPortal() {
     setDeliveries(prev => prev.map(d => d.id === id ? { ...d, observations: text } : d));
   };
 
-  const handleClearDeliveries = async () => {
-    if (!confirm("TEM CERTEZA QUE DESEJA APAGAR TODAS AS ENTREGAS? Isso não pode ser desfeito.")) return;
-    const actions = await import("@/lib/actions");
-    await actions.clearDeliveries();
-    fetchData();
-  };
 
   return (
     <div className="page-container animate-entrance" style={{ marginTop: '2rem' }}>
@@ -95,9 +90,16 @@ export default function RestaurantPortal() {
               <Users size={16} /> Motoristas
             </button>
           </div>
-          <button onClick={handleClearDeliveries} style={{ padding: '0.8rem', background: 'rgba(255,45,85,0.05)', border: '1px solid rgba(255,45,85,0.1)', color: 'var(--danger)', borderRadius: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', fontWeight: 700 }}>
-            <ClipboardList size={18} /> LIMPAR TUDO
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', background: 'var(--surface-high)', padding: '0.4rem 0.8rem', borderRadius: '12px', gap: '8px' }}>
+            <Clock size={16} style={{ color: 'var(--accent)' }} />
+            <input 
+              type="date" 
+              value={selectedDate} 
+              onChange={e => setSelectedDate(e.target.value)}
+              className="input-premium"
+              style={{ padding: '0.2rem', background: 'transparent', border: 'none', color: 'var(--text)', fontSize: '12px', cursor: 'pointer' }}
+            />
+          </div>
           <button onClick={handleAdminLogout} style={{ padding: '0.8rem', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-muted)', borderRadius: '12px', cursor: 'pointer' }}>
             <LogOut size={18} />
           </button>

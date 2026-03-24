@@ -115,20 +115,51 @@ export async function updateObservations(id: string, text: string) {
   revalidatePath("/restaurant");
 }
 
-export async function getDeliveries() {
+export async function getDeliveries(dateStr?: string) {
+  let where = {};
+  if (dateStr) {
+    const start = new Date(dateStr);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(dateStr);
+    end.setHours(23, 59, 59, 999);
+    where = {
+      scannedAt: {
+        gte: start,
+        lte: end
+      }
+    };
+  }
+
   return prisma.delivery.findMany({
+    where,
     orderBy: { scannedAt: 'desc' },
     include: { driver: true }
   });
 }
 
-export async function getSummary() {
+export async function getSummary(dateStr?: string) {
+  let where = {};
+  if (dateStr) {
+    const start = new Date(dateStr);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(dateStr);
+    end.setHours(23, 59, 59, 999);
+    where = {
+      scannedAt: {
+        gte: start,
+        lte: end
+      }
+    };
+  }
+
   const [counts, sums] = await Promise.all([
     prisma.delivery.groupBy({
       by: ['status'],
+      where,
       _count: { _all: true }
     }),
     prisma.delivery.aggregate({
+      where,
       _sum: { totalAmount: true, deliveryFee: true }
     })
   ]);
