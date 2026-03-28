@@ -7,14 +7,17 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "sync": "node sync_local_gplus.js",
     "postinstall": "prisma generate"
   },
   "dependencies": {
     "@prisma/client": "^5.15.0",
+    "axios": "^1.7.9",
     "clsx": "^2.1.1",
     "framer-motion": "^12.38.0",
     "lucide-react": "^0.577.0",
     "next": "16.2.0",
+    "node-firebird": "^2.0.2",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "tailwind-merge": "^3.5.0",

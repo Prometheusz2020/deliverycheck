@@ -34,3 +34,16 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## Agente de Sincronização GPlus (Local)
+
+Para rodar o agente de sincronização no servidor local do restaurante:
+
+1. Certifique-se de que o Node.js está instalado.
+2. No terminal, execute:
+   ```bash
+   npm run sync
+   ```
+3. Ou simplesmente clique duas vezes no arquivo `iniciar_sincronizacao.bat` na raiz do projeto.
+
+O script irá monitorar o banco de dados Firebird local e enviar os novos pedidos para a nuvem automaticamente.
