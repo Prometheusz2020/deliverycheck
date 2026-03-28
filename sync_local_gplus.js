@@ -1,29 +1,27 @@
 /**
  * DELIVERYCHECK - AGENTE DE SINCRONIZAÇÃO AUTOMÁTICO (GPLUS)
- * VERSION: 1.0.0
+ * VERSION: 1.1.0
  * 
  * Este script roda como um serviço em segundo plano no servidor do restaurante.
  */
 
+require('dotenv').config();
 const Firebird = require('node-firebird');
 const axios = require('axios');
 
 // CONFIGURAÇÕES DO SERVIDOR LOCAL (GPLUS)
 const fbOptions = {
-    host: '127.0.0.1',
-    port: 3050,
-    database: 'C:\\Gplus\\DADOS\\GPLUS.FDB',
-    user: 'SYSDBA',
-    password: 'masterkey',
+    host: process.env.FB_HOST || '127.0.0.1',
+    port: parseInt(process.env.FB_PORT || '3050'),
+    database: process.env.FB_DATABASE || 'C:\\Gplus\\DADOS\\GPLUS.FDB',
+    user: process.env.FB_USER || 'SYSDBA',
+    password: process.env.FB_PASSWORD || 'masterkey',
 };
 
 // CONFIGURAÇÕES DA NUVEM (VERCEL)
-const VERCEL_URL = 'https://delivery-check-six.vercel.app'; // Verifique sua URL correta
-const SYNC_TOKEN = 'ztilabs_sync_secret_2024';
-const POLLING_INTERVAL = 30000; // 30 segundos
-
-// Cache simples para evitar reenvios desnecessários se nada mudou
-let lastSyncCount = 0;
+const VERCEL_URL = process.env.VERCEL_URL || 'https://delivery-check-six.vercel.app';
+const SYNC_TOKEN = process.env.SYNC_TOKEN || 'ztilabs_sync_secret_2024';
+const POLLING_INTERVAL = parseInt(process.env.POLLING_INTERVAL || '30000'); // 30 segundos
 
 async function syncAllOrdersFromToday() {
     console.log(`[${new Date().toLocaleTimeString()}] Iniciando verificação de novos pedidos...`);
@@ -31,6 +29,7 @@ async function syncAllOrdersFromToday() {
     Firebird.attach(fbOptions, (err, db) => {
         if (err) {
             console.error('[-] Falha ao conectar no Firebird:', err.message);
+            console.log('Verifique se o caminho do banco no .env está correto:', fbOptions.database);
             return;
         }
 
@@ -91,7 +90,9 @@ async function syncAllOrdersFromToday() {
 console.log('=========================================');
 console.log('       DELIVERYCHECK - SYNC AGENT        ');
 console.log('=========================================');
-console.log(`Iniciando em modo automático (Intervalo: ${POLLING_INTERVAL/1000}s)`);
+console.log(`Servidor: ${fbOptions.host}:${fbOptions.port}`);
+console.log(`Intervalo: ${POLLING_INTERVAL/1000}s`);
+console.log('=========================================');
 
 syncAllOrdersFromToday();
 setInterval(syncAllOrdersFromToday, POLLING_INTERVAL);
