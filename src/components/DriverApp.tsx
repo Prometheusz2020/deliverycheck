@@ -10,6 +10,15 @@ import {
   Package, Zap, Loader2, ArrowRight, ShieldCheck, MessageSquare, ArrowLeft, Delete
 } from "lucide-react";
 
+const hasValidAddress = (address?: string) => {
+  if (!address) return false;
+  const clean = address.trim().toLowerCase();
+  if (clean === "não informado" || clean === "nao informado" || clean === "não informada") return false;
+  if (clean === "s/e" || clean.startsWith("s/e,") || clean === "s/e, -") return false;
+  if (clean.replace(/[^a-z0-9]/g, "") === "se") return false;
+  return true;
+};
+
 export default function DriverApp() {
   const [driver, setDriver] = useState<{ id: string; name: string } | null>(null);
   const [driversList, setDriversList] = useState<Driver[]>([]);
@@ -25,7 +34,8 @@ export default function DriverApp() {
       const actions = await import("@/lib/actions");
       const today = new Date().toISOString().split('T')[0];
       const data = await actions.getDeliveries(today);
-      setDeliveries(data as Delivery[]);
+      const filtered = (data as Delivery[]).filter(d => hasValidAddress(d.address));
+      setDeliveries(filtered);
     } catch (err) {
       console.error("Driver Fetch Error:", err);
     }
@@ -40,7 +50,8 @@ export default function DriverApp() {
         actions.getDeliveries(today)
       ]);
       setDriversList(driversData);
-      setDeliveries(deliveriesData as Delivery[]);
+      const filtered = (deliveriesData as Delivery[]).filter(d => hasValidAddress(d.address));
+      setDeliveries(filtered);
     } catch (err) {
       console.error("Waiting Room Fetch Error:", err);
     }
