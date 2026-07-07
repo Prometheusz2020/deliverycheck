@@ -16,6 +16,7 @@ const hasValidAddress = (address?: string) => {
   if (clean === "não informado" || clean === "nao informado" || clean === "não informada") return false;
   if (clean === "s/e" || clean.startsWith("s/e,") || clean === "s/e, -") return false;
   if (clean.replace(/[^a-z0-9]/g, "") === "se") return false;
+  if (clean.includes("entregar no estabelecimento")) return false;
   return true;
 };
 
