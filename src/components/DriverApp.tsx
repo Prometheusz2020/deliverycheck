@@ -392,27 +392,6 @@ export default function DriverApp() {
         </button>
       </header>
 
-      <div className="card-premium animate-entrance" style={{ marginBottom: '1.5rem', padding: '1.5rem' }}>
-        <h3 style={{ fontSize: '0.9rem', marginBottom: '1rem', color: 'var(--accent)', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.1em' }}>REGISTRAR COMANDA</h3>
-        <form onSubmit={handleRegisterDelivery} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', background: 'var(--surface-low)', padding: '0.5rem 1rem', borderRadius: '15px' }}>
-            <span style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--accent)' }}>Comanda #</span>
-            <input 
-              type="number" 
-              value={manualOrderNumber} 
-              onChange={e => setManualOrderNumber(e.target.value)}
-              className="input-premium"
-              style={{ fontSize: '1.8rem', fontWeight: 800, textAlign: 'left', border: 'none', background: 'transparent', padding: '0.5rem' }}
-              placeholder="000"
-              required
-            />
-          </div>
-          <button type="submit" className="btn-main" style={{ width: '100%', background: 'linear-gradient(135deg, var(--primary), #0066ff)', color: '#fff', border: 'none', height: '55px', fontSize: '1.1rem' }}>
-            {isLoggingIn ? <Loader2 size={24} className="spin" /> : <><Package size={22} /> <span>Vincular Comanda</span></>}
-          </button>
-        </form>
-      </div>
-
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', paddingBottom: '3rem' }}>
         <div>
           <h3 style={{ fontSize: '0.8rem', color: 'var(--accent)', fontWeight: 900, textTransform: 'uppercase', marginBottom: '1rem', letterSpacing: '0.2em', display: 'flex', alignItems: 'center', gap: '8px' }}>
