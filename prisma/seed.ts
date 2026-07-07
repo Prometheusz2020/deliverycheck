@@ -28,10 +28,10 @@ async function main() {
 
   // Create Drivers
   const drivers = [
-    { name: 'Lamartine', password: '123' },
-    { name: 'Ju Braga', password: '123' },
-    { name: 'Douglas', password: '123' },
-    { name: 'Richard', password: '123' },
+    { name: 'Lamartine', password: '1234' },
+    { name: 'Ju Braga', password: '1234' },
+    { name: 'Douglas', password: '1234' },
+    { name: 'Richard', password: '1234' },
   ]
 
   for (const driver of drivers) {

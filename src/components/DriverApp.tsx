@@ -508,57 +508,6 @@ export default function DriverApp() {
           border-color: var(--accent) !important;
           box-shadow: 0 8px 30px rgba(57, 255, 20, 0.05);
         }
-        .pin-btn {
-          width: 68px;
-          height: 68px;
-          border-radius: 50%;
-          border: 1px solid rgba(255, 255, 255, 0.08);
-          background: rgba(255, 255, 255, 0.03);
-          color: var(--text-primary);
-          font-family: 'Outfit', sans-serif;
-          font-size: 1.8rem;
-          font-weight: 600;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          cursor: pointer;
-          transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
-          outline: none;
-        }
-        .pin-btn:hover {
-          background: rgba(255, 255, 255, 0.08);
-          border-color: rgba(0, 242, 255, 0.3);
-          box-shadow: 0 0 15px rgba(0, 242, 255, 0.15);
-          transform: scale(1.08);
-        }
-        .pin-btn:active {
-          background: rgba(0, 242, 255, 0.2);
-          border-color: var(--primary);
-          box-shadow: 0 0 20px rgba(0, 242, 255, 0.4);
-          transform: scale(0.92);
-        }
-        .pin-btn-special {
-          border: none;
-          background: transparent;
-          color: var(--text-secondary);
-        }
-        .pin-btn-special:hover {
-          background: rgba(255, 255, 255, 0.05);
-          color: #fff;
-          box-shadow: none;
-          transform: scale(1.08);
-        }
-        .pin-btn-special:active {
-          background: rgba(255, 255, 255, 0.1);
-          transform: scale(0.92);
-        }
-        .pin-btn-danger:hover {
-          color: var(--danger);
-          background: rgba(255, 45, 85, 0.05);
-        }
-        .pin-btn-danger:active {
-          background: rgba(255, 45, 85, 0.2);
-        }
       `}</style>
     </div>
   );

@@ -251,3 +251,68 @@ h1, h2, h3, h4 {
 .anima-glow {
   animation: glow 8s ease-in-out infinite;
 }
+
+/* PIN KEYPAD OVERLAY STYLES */
+.pin-btn {
+  width: 68px !important;
+  height: 68px !important;
+  border-radius: 50% !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  background: rgba(255, 255, 255, 0.03) !important;
+  color: var(--text-primary) !important;
+  font-family: 'Outfit', sans-serif !important;
+  font-size: 1.8rem !important;
+  font-weight: 600 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  outline: none !important;
+  padding: 0 !important;
+}
+
+.pin-btn:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border-color: rgba(0, 242, 255, 0.3) !important;
+  box-shadow: 0 0 15px rgba(0, 242, 255, 0.15) !important;
+  transform: scale(1.08) !important;
+}
+
+.pin-btn:active {
+  background: rgba(0, 242, 255, 0.2) !important;
+  border-color: var(--primary) !important;
+  box-shadow: 0 0 20px rgba(0, 242, 255, 0.4) !important;
+  transform: scale(0.92) !important;
+}
+
+.pin-btn-special {
+  border: none !important;
+  background: transparent !important;
+  color: var(--text-secondary) !important;
+  box-shadow: none !important;
+}
+
+.pin-btn-special:hover {
+  background: rgba(255, 255, 255, 0.05) !important;
+  color: #fff !important;
+  box-shadow: none !important;
+  transform: scale(1.08) !important;
+}
+
+.pin-btn-special:active {
+  background: rgba(255, 255, 255, 0.1) !important;
+  transform: scale(0.92) !important;
+}
+
+.pin-btn-danger:hover {
+  color: var(--danger) !important;
+  background: rgba(255, 45, 85, 0.05) !important;
+  border-color: rgba(255, 45, 85, 0.3) !important;
+  box-shadow: 0 0 15px rgba(255, 45, 85, 0.2) !important;
+}
+
+.pin-btn-danger:active {
+  background: rgba(255, 45, 85, 0.15) !important;
+  border-color: var(--danger) !important;
+}
