@@ -45,6 +45,42 @@ export async function addDelivery(data: Partial<Delivery>) {
   return delivery;
 }
 
+export async function processDriverOrderInput(orderNumber: string, driverId: string, driverName: string) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  const trimmedNumber = orderNumber.trim();
+
+  // Tenta encontrar um pedido existente vindo do GPlus (ou outro) que ainda não tem motorista
+  const existing = await prisma.delivery.findFirst({
+    where: {
+      orderNumber: { equals: trimmedNumber, mode: 'insensitive' },
+      scannedAt: { gte: today },
+      status: "PENDENTE"
+    }
+  });
+
+  if (existing) {
+    // Atribui ao motorista atual
+    const updated = await prisma.delivery.update({
+      where: { id: existing.id },
+      data: {
+        driverId: driverId,
+        deliveryPerson: driverName,
+        status: "EM ROTA"
+      }
+    });
+    
+    revalidatePath("/");
+    revalidatePath("/restaurant");
+    revalidatePath("/driver");
+    return { success: true, action: "ASSIGNED", delivery: updated };
+  }
+
+  // Se não existir, retornamos um erro para o motoboy verificar no servidor local
+  return { success: false, error: "Pedido não encontrado no servidor. Verifique o número ou aguarde a sincronização." };
+}
+
 export async function updateDeliveryStatus(id: string, status: DeliveryStatus, driverId?: string) {
   const delivery = await prisma.delivery.findUnique({ where: { id } });
   if (!delivery) return;

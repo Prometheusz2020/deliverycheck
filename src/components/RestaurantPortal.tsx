@@ -133,7 +133,7 @@ export default function RestaurantPortal() {
                 <table className="table-premium">
                   <thead>
                     <tr>
-                      <th>Cód</th>
+                      <th>Comanda</th>
                       <th>Cliente</th>
                       <th>Ação</th>
                     </tr>
@@ -195,7 +195,7 @@ export default function RestaurantPortal() {
                   <table className="table-premium">
                     <thead>
                       <tr>
-                        <th>Cód</th>
+                        <th>Comanda</th>
                         <th>Cliente</th>
                         <th>Obs / Notas</th>
                         <th>Ações</th>
@@ -206,7 +206,8 @@ export default function RestaurantPortal() {
                         <tr key={delivery.id}>
                           <td style={{ fontWeight: 800 }}>{delivery.orderNumber}</td>
                           <td>
-                            <p>{delivery.customerName}</p>
+                            <p style={{ fontWeight: 800 }}>{delivery.customerName}</p>
+                            <p style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{delivery.address}</p>
                           </td>
                           <td>
                             <input 
@@ -263,7 +264,7 @@ export default function RestaurantPortal() {
                   <tbody>
                     {deliveries.filter(d => d.status === 'ENTREGUE').slice(0, 10).map(delivery => (
                       <tr key={delivery.id}>
-                        <td>{delivery.orderNumber}</td>
+                        <td style={{ fontWeight: 800, color: 'var(--text-muted)' }}>Comanda {delivery.orderNumber}</td>
                         <td>{delivery.customerName}</td>
                         <td style={{ color: 'var(--text-muted)', fontSize: '11px' }}>por {delivery.deliveryPerson}</td>
                         <td style={{ color: 'var(--success)', fontWeight: 800 }}>ENTREGUE</td>

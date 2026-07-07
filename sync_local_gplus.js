@@ -35,14 +35,14 @@ async function syncAllOrdersFromToday() {
 
         const sql = `
             SELECT 
-                C.NUMERO_COMANDA,
+                COALESCE(V.NCOMANDA, C.NUMERO_COMANDA, V.ID) AS NUMERO_COMANDA,
                 V.NOME_CLIENTE,
                 E.LOGRADOURO,
                 E.NUMERO AS NUMERO_CASA,
                 E.BAIRRO,
                 V.VALOR_FINAL
-            FROM ECF_VENDA_COMANDA C
-            INNER JOIN ECF_VENDA_CABECALHO V ON (V.ID = C.ID_VENDA_CABECALHO)
+            FROM ECF_VENDA_CABECALHO V
+            LEFT JOIN ECF_VENDA_COMANDA C ON (C.ID_VENDA_CABECALHO = V.ID)
             LEFT JOIN ENDERECO E ON (E.ID = V.ID_ENDERECO)
             WHERE V.DATA_VENDA = CURRENT_DATE
         `;
@@ -64,9 +64,9 @@ async function syncAllOrdersFromToday() {
 
             for (const row of result) {
                 const orderData = {
-                    orderNumber: `#${row.NUMERO_COMANDA}`,
-                    customerName: row.NOME_CLIENTE || "Cliente GPlus",
-                    address: `${row.LOGRADOURO || 'S/E'}, ${row.NUMERO_CASA || ''} - ${row.BAIRRO || ''}`,
+                    orderNumber: `#${String(row.NUMERO_COMANDA).trim()}`,
+                    customerName: (row.NOME_CLIENTE || "Cliente GPlus").trim(),
+                    address: `${(row.LOGRADOURO || 'S/E').trim()}, ${(String(row.NUMERO_CASA || '')).trim()} - ${(row.BAIRRO || '').trim()}`,
                     totalAmount: parseFloat(row.VALOR_FINAL || 0),
                 };
 

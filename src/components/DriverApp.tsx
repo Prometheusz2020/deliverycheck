@@ -85,18 +85,20 @@ export default function DriverApp() {
     setIsLoggingIn(true); 
     try {
       const actions = await import("@/lib/actions");
-      await actions.addDelivery({
-        orderNumber: `#${manualOrderNumber}`, // Inclui o # conforme solicitado
-        customerName: "Pedido Avulso",
-        address: "Destino a definir",
-        driverId: driver.id,
-        deliveryPerson: driver.name,
-        status: 'EM ROTA'
-      });
-      setManualOrderNumber("");
-      fetchData();
+      const res = await actions.processDriverOrderInput(
+        `#${manualOrderNumber}`,
+        driver.id,
+        driver.name
+      );
+      
+      if (!res.success) {
+        alert(res.error || "Pedido não encontrado.");
+      } else {
+        setManualOrderNumber("");
+        fetchData();
+      }
     } catch {
-      alert("Erro ao registrar entrega.");
+      alert("Erro ao conectar com o servidor.");
     }
     setIsLoggingIn(false);
   };
@@ -180,10 +182,10 @@ export default function DriverApp() {
       </header>
 
       <div className="card-premium animate-entrance" style={{ marginBottom: '1.5rem', padding: '1.5rem' }}>
-        <h3 style={{ fontSize: '0.9rem', marginBottom: '1rem', color: 'var(--accent)', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.1em' }}>REGISTRAR NOVO PEDIDO</h3>
+        <h3 style={{ fontSize: '0.9rem', marginBottom: '1rem', color: 'var(--accent)', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.1em' }}>REGISTRAR COMANDA</h3>
         <form onSubmit={handleRegisterDelivery} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', background: 'var(--surface-low)', padding: '0.5rem 1rem', borderRadius: '15px' }}>
-            <span style={{ fontSize: '1.8rem', fontWeight: 800, color: 'var(--accent)' }}>#</span>
+            <span style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--accent)' }}>Comanda #</span>
             <input 
               type="number" 
               value={manualOrderNumber} 
@@ -195,7 +197,7 @@ export default function DriverApp() {
             />
           </div>
           <button type="submit" className="btn-main" style={{ width: '100%', background: 'linear-gradient(135deg, var(--primary), #0066ff)', color: '#fff', border: 'none', height: '55px', fontSize: '1.1rem' }}>
-            {isLoggingIn ? <Loader2 size={24} className="spin" /> : <><Package size={22} /> <span>Registrar Início</span></>}
+            {isLoggingIn ? <Loader2 size={24} className="spin" /> : <><Package size={22} /> <span>Vincular Comanda</span></>}
           </button>
         </form>
       </div>
@@ -214,10 +216,13 @@ export default function DriverApp() {
             ) : (
               myDeliveries.map(delivery => (
                 <div key={delivery.id} className="card-premium animate-entrance" style={{ borderLeft: '4px solid var(--accent)' }}>
-                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.8rem' }}>
-                     <span style={{ fontSize: '9px', background: 'rgba(57, 255, 20, 0.1)', color: 'var(--accent)', padding: '0.2rem 0.5rem', borderRadius: '4px', fontWeight: 900 }}>{delivery.orderNumber}</span>
+                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                     <span style={{ fontSize: '1.2rem', background: 'rgba(57, 255, 20, 0.1)', color: 'var(--accent)', padding: '0.4rem 0.8rem', borderRadius: '8px', fontWeight: 900, border: '1px solid rgba(57, 255, 20, 0.2)' }}>
+                       Comanda {delivery.orderNumber}
+                     </span>
+                     <span style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Em Rota</span>
                    </div>
-                   <p style={{ fontSize: '1.1rem', fontWeight: 800, marginBottom: '0.4rem' }}>{delivery.customerName}</p>
+                   <p style={{ fontSize: '1.3rem', fontWeight: 800, marginBottom: '0.5rem', letterSpacing: '-0.02em' }}>{delivery.customerName}</p>
                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '0.8rem' }}>
                       <MapPin size={14} /> {delivery.address}
                    </div>
@@ -260,14 +265,19 @@ export default function DriverApp() {
         {availableDeliveries.length > 0 && (
           <div>
             <h3 style={{ fontSize: '0.8rem', color: 'var(--primary)', fontWeight: 900, textTransform: 'uppercase', marginBottom: '1rem', letterSpacing: '0.2em', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Package size={14} /> Pedidos Disponíveis
+              <Package size={14} /> Comandas Disponíveis
             </h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
               {availableDeliveries.map(delivery => (
                 <div key={delivery.id} className="card-premium" style={{ padding: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div>
-                    <p style={{ fontWeight: 800, fontSize: '0.9rem' }}>{delivery.customerName}</p>
-                    <p style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{(delivery.address || "").slice(0, 35)}...</p>
+                  <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                    <div style={{ background: 'rgba(57, 255, 20, 0.1)', padding: '0.5rem', borderRadius: '8px', minWidth: '110px', textAlign: 'center' }}>
+                      <span style={{ fontSize: '0.9rem', fontWeight: 900, color: 'var(--accent)' }}>Comanda {delivery.orderNumber}</span>
+                    </div>
+                    <div>
+                      <p style={{ fontWeight: 800, fontSize: '0.9rem' }}>{delivery.customerName}</p>
+                      <p style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{(delivery.address || "").slice(0, 35)}...</p>
+                    </div>
                   </div>
                   <button onClick={() => handleStatusUpdate(delivery.id, 'EM ROTA')} className="btn-outline" style={{ borderColor: 'var(--primary)', color: 'var(--primary)', padding: '0.4rem 0.8rem', fontSize: '11px' }}>
                     Assumir
