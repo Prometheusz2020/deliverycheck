@@ -7,7 +7,7 @@ import {
 import { Delivery, DeliveryStatus, Driver } from "@/lib/types";
 import { 
   CheckCircle, MapPin, User, LogOut, 
-  Package, Zap, Loader2, ArrowRight, ShieldCheck, MessageSquare 
+  Package, Zap, Loader2, ArrowRight, ShieldCheck, MessageSquare, ArrowLeft, Delete
 } from "lucide-react";
 
 export default function DriverApp() {
@@ -257,123 +257,111 @@ export default function DriverApp() {
             left: 0,
             right: 0,
             bottom: 0,
-            background: 'rgba(0,0,0,0.85)',
-            backdropFilter: 'blur(10px)',
+            background: 'rgba(2, 2, 8, 0.85)',
+            backdropFilter: 'blur(25px)',
+            WebkitBackdropFilter: 'blur(25px)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             zIndex: 999,
             padding: '1rem'
           }}>
-            <div className="card-premium animate-entrance" style={{ width: '100%', maxWidth: '360px', padding: '2rem', textAlign: 'center' }}>
-              <h3 style={{ fontSize: '1.2rem', marginBottom: '0.5rem' }}>Acesso de Segurança</h3>
-              <p style={{ color: 'var(--accent)', fontWeight: 800, fontSize: '1.1rem', marginBottom: '1.5rem' }}>{selectedDriver.name.toUpperCase()}</p>
+            <div className="card-premium animate-entrance" style={{ 
+              width: '100%', 
+              maxWidth: '380px', 
+              padding: '2.5rem 2rem', 
+              textAlign: 'center', 
+              background: 'rgba(10, 10, 26, 0.95)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              borderRadius: '24px',
+              boxShadow: '0 24px 64px rgba(0,0,0,0.85)'
+            }}>
+              <p style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.3em', marginBottom: '0.5rem' }}>AUTENTICAÇÃO MOTOBOY</p>
+              <h3 style={{ fontSize: '1.6rem', color: '#fff', fontWeight: 800, letterSpacing: '-0.02em', marginBottom: '0.3rem' }}>{selectedDriver.name.toUpperCase()}</h3>
+              <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '2rem' }}>Digite seu PIN de segurança para continuar</p>
               
-              {/* PIN Dots display */}
-              <div style={{ display: 'flex', justifyContent: 'center', gap: '15px', marginBottom: '2rem' }}>
+              {/* PIN Dots display container */}
+              <div style={{ 
+                background: 'rgba(0, 0, 0, 0.35)', 
+                border: '1px solid rgba(255, 255, 255, 0.04)', 
+                borderRadius: '99px', 
+                padding: '0.8rem 2.2rem', 
+                display: 'inline-flex', 
+                gap: '16px', 
+                marginBottom: '2.5rem' 
+              }}>
                 {[0, 1, 2, 3].map((idx) => (
                   <div 
                     key={idx} 
                     style={{
-                      width: '18px',
-                      height: '18px',
+                      width: '16px',
+                      height: '16px',
                       borderRadius: '50%',
-                      border: '2px solid var(--accent)',
+                      border: '2px solid rgba(255, 255, 255, 0.2)',
+                      borderColor: pinCode.length > idx ? 'var(--accent)' : 'rgba(255,255,255,0.2)',
                       background: pinCode.length > idx ? 'var(--accent)' : 'transparent',
-                      transition: 'all 0.1s ease'
+                      boxShadow: pinCode.length > idx ? '0 0 10px var(--accent)' : 'none',
+                      transition: 'all 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
                     }}
                   />
                 ))}
               </div>
 
-              {/* Keypad */}
+              {/* Keypad Grid */}
               <div style={{ 
                 display: 'grid', 
                 gridTemplateColumns: 'repeat(3, 1fr)', 
-                gap: '12px', 
-                marginBottom: '1.5rem',
+                gap: '16px', 
+                marginBottom: '2rem',
                 maxWidth: '280px',
-                margin: '0 auto 1.5rem auto'
+                margin: '0 auto 2rem auto',
+                justifyItems: 'center'
               }}>
                 {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(num => (
                   <button 
                     key={num} 
                     onClick={() => handleKeypadPress(String(num))}
-                    className="btn-outline"
+                    className="pin-btn"
                     type="button"
-                    style={{ 
-                      height: '60px', 
-                      borderRadius: '50%', 
-                      fontSize: '1.5rem', 
-                      fontWeight: 700, 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      justifyContent: 'center',
-                      border: '1px solid rgba(255,255,255,0.1)'
-                    }}
                   >
                     {num}
                   </button>
                 ))}
+                
+                {/* Back / Voltar Button */}
                 <button 
-                  onClick={handleKeypadClear}
-                  className="btn-outline"
+                  onClick={() => { setSelectedDriver(null); setPinCode(""); }}
+                  className="pin-btn pin-btn-special"
                   type="button"
-                  style={{ 
-                    height: '60px', 
-                    borderRadius: '50%', 
-                    fontSize: '0.9rem', 
-                    fontWeight: 700, 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    justifyContent: 'center',
-                    borderColor: 'rgba(255,45,85,0.2)',
-                    color: 'var(--danger)'
-                  }}
+                  title="Voltar"
                 >
-                  Limpar
+                  <ArrowLeft size={22} />
                 </button>
+                
+                {/* Zero Button */}
                 <button 
                   onClick={() => handleKeypadPress('0')}
-                  className="btn-outline"
+                  className="pin-btn"
                   type="button"
-                  style={{ 
-                    height: '60px', 
-                    borderRadius: '50%', 
-                    fontSize: '1.5rem', 
-                    fontWeight: 700, 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    justifyContent: 'center',
-                    border: '1px solid rgba(255,255,255,0.1)'
-                  }}
                 >
                   0
                 </button>
+                
+                {/* Clear / Delete Button */}
                 <button 
-                  onClick={() => { setSelectedDriver(null); setPinCode(""); }}
-                  className="btn-outline"
+                  onClick={handleKeypadClear}
+                  className="pin-btn pin-btn-special pin-btn-danger"
                   type="button"
-                  style={{ 
-                    height: '60px', 
-                    borderRadius: '50%', 
-                    fontSize: '0.9rem', 
-                    fontWeight: 700, 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    justifyContent: 'center',
-                    border: '1px solid rgba(255,255,255,0.1)',
-                    color: '#fff'
-                  }}
+                  title="Limpar"
                 >
-                  Voltar
+                  <Delete size={22} />
                 </button>
               </div>
               
               {isLoggingIn && (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', minHeight: '20px' }}>
                   <Loader2 size={16} className="spin" style={{ color: 'var(--accent)' }} />
-                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Verificando PIN...</span>
+                  <span style={{ fontSize: '11px', color: 'var(--accent)', fontWeight: 600 }}>Verificando PIN...</span>
                 </div>
               )}
             </div>
@@ -519,6 +507,57 @@ export default function DriverApp() {
           transform: translateY(-2px);
           border-color: var(--accent) !important;
           box-shadow: 0 8px 30px rgba(57, 255, 20, 0.05);
+        }
+        .pin-btn {
+          width: 68px;
+          height: 68px;
+          border-radius: 50%;
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          background: rgba(255, 255, 255, 0.03);
+          color: var(--text-primary);
+          font-family: 'Outfit', sans-serif;
+          font-size: 1.8rem;
+          font-weight: 600;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+          outline: none;
+        }
+        .pin-btn:hover {
+          background: rgba(255, 255, 255, 0.08);
+          border-color: rgba(0, 242, 255, 0.3);
+          box-shadow: 0 0 15px rgba(0, 242, 255, 0.15);
+          transform: scale(1.08);
+        }
+        .pin-btn:active {
+          background: rgba(0, 242, 255, 0.2);
+          border-color: var(--primary);
+          box-shadow: 0 0 20px rgba(0, 242, 255, 0.4);
+          transform: scale(0.92);
+        }
+        .pin-btn-special {
+          border: none;
+          background: transparent;
+          color: var(--text-secondary);
+        }
+        .pin-btn-special:hover {
+          background: rgba(255, 255, 255, 0.05);
+          color: #fff;
+          box-shadow: none;
+          transform: scale(1.08);
+        }
+        .pin-btn-special:active {
+          background: rgba(255, 255, 255, 0.1);
+          transform: scale(0.92);
+        }
+        .pin-btn-danger:hover {
+          color: var(--danger);
+          background: rgba(255, 45, 85, 0.05);
+        }
+        .pin-btn-danger:active {
+          background: rgba(255, 45, 85, 0.2);
         }
       `}</style>
     </div>
