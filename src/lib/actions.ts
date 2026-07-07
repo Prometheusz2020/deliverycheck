@@ -128,6 +128,26 @@ export async function reassignDelivery(deliveryId: string, newDriverId: string) 
   revalidatePath("/driver");
 }
 
+export async function bulkAssignDeliveries(deliveryIds: string[], newDriverId: string) {
+  const driver = await prisma.driver.findUnique({ where: { id: newDriverId } });
+  if (!driver) return { success: false, error: "Motorista não encontrado." };
+
+  await prisma.delivery.updateMany({
+    where: {
+      id: { in: deliveryIds }
+    },
+    data: {
+      driverId: driver.id,
+      deliveryPerson: driver.name,
+      status: "EM ROTA"
+    }
+  });
+
+  revalidatePath("/restaurant");
+  revalidatePath("/driver");
+  return { success: true };
+}
+
 export async function deleteDelivery(id: string) {
   await prisma.delivery.delete({ where: { id } });
   revalidatePath("/restaurant");
