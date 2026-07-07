@@ -272,3 +272,9 @@ export async function logoutAdmin() {
   cookieStore.delete("admin_session");
   revalidatePath("/restaurant");
 }
+
+export async function logoutDriver() {
+  const cookieStore = await cookies();
+  cookieStore.delete("driver_id");
+  cookieStore.delete("driver_name");
+}

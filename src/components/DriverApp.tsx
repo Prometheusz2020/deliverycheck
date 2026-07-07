@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { 
-  getSessionDriver, logoutAdmin 
+  getSessionDriver 
 } from "@/lib/auth-actions";
-import { Delivery, DeliveryStatus } from "@/lib/types";
+import { Delivery, DeliveryStatus, Driver } from "@/lib/types";
 import { 
   CheckCircle, MapPin, User, LogOut, 
   Package, Zap, Loader2, ArrowRight, ShieldCheck, MessageSquare 
@@ -12,11 +12,12 @@ import {
 
 export default function DriverApp() {
   const [driver, setDriver] = useState<{ id: string; name: string } | null>(null);
+  const [driversList, setDriversList] = useState<Driver[]>([]);
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
   
-  // Login State
-  const [loginName, setLoginName] = useState("");
-  const [loginPass, setLoginPass] = useState("");
+  // PIN Login State
+  const [selectedDriver, setSelectedDriver] = useState<Driver | null>(null);
+  const [pinCode, setPinCode] = useState("");
   const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   const fetchData = async () => {
@@ -30,6 +31,21 @@ export default function DriverApp() {
     }
   };
 
+  const fetchDriversAndDeliveries = async () => {
+    try {
+      const actions = await import("@/lib/actions");
+      const today = new Date().toISOString().split('T')[0];
+      const [driversData, deliveriesData] = await Promise.all([
+        actions.getDrivers(),
+        actions.getDeliveries(today)
+      ]);
+      setDriversList(driversData);
+      setDeliveries(deliveriesData as Delivery[]);
+    } catch (err) {
+      console.error("Waiting Room Fetch Error:", err);
+    }
+  };
+
   useEffect(() => {
     const checkSession = async () => {
       try {
@@ -39,9 +55,11 @@ export default function DriverApp() {
           fetchData();
         } else {
           setDriver(null);
+          fetchDriversAndDeliveries();
         }
       } catch {
         setDriver(null);
+        fetchDriversAndDeliveries();
       }
     };
     checkSession();
@@ -53,28 +71,59 @@ export default function DriverApp() {
     return () => clearInterval(interval);
   }, [driver]);
 
-  const handleDriverLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
+  useEffect(() => {
+    if (driver) return;
+    const interval = setInterval(fetchDriversAndDeliveries, 15000);
+    return () => clearInterval(interval);
+  }, [driver]);
+
+  const handlePinSubmit = async (pin: string) => {
+    if (!selectedDriver) return;
     setIsLoggingIn(true);
     try {
       const actions = await import("@/lib/actions");
-      const res = await actions.loginDriver(loginName, loginPass);
+      const res = await actions.loginDriver(selectedDriver.name, pin);
       if (res.success) {
         const session = await getSessionDriver();
         setDriver(session);
+        setSelectedDriver(null);
+        setPinCode("");
         fetchData();
       } else {
-        alert("Credenciais de motorista inválidas.");
+        alert("PIN incorreto!");
+        setPinCode("");
       }
     } catch {
-      alert("Erro ao conectar com a central.");
+      alert("Erro ao conectar com o servidor.");
     }
     setIsLoggingIn(false);
   };
 
+  const handleKeypadPress = (val: string) => {
+    if (isLoggingIn || pinCode.length >= 4) return;
+    const newPin = pinCode + val;
+    setPinCode(newPin);
+    if (newPin.length === 4) {
+      handlePinSubmit(newPin);
+    }
+  };
+
+  const handleKeypadClear = () => {
+    if (isLoggingIn) return;
+    setPinCode("");
+  };
+
   const handleLogout = async () => {
-    await logoutAdmin(); // Reuso da lógica de limpar cookies
+    try {
+      const actions = await import("@/lib/actions");
+      await actions.logoutDriver();
+    } catch (err) {
+      console.error("Logout error:", err);
+    }
     setDriver(null);
+    setSelectedDriver(null);
+    setPinCode("");
+    fetchDriversAndDeliveries();
   };
 
   const [manualOrderNumber, setManualOrderNumber] = useState("");
@@ -111,51 +160,225 @@ export default function DriverApp() {
 
   if (!driver) {
     return (
-      <div className="animate-entrance" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '85vh', padding: '1.5rem' }}>
-        <div className="card-premium" style={{ width: '100%', maxWidth: '400px', textAlign: 'center', padding: '3rem 2rem' }}>
-          <div style={{ padding: '1rem', background: 'rgba(57, 255, 20, 0.05)', borderRadius: '20px', display: 'inline-flex', marginBottom: '2rem' }}>
-            <Zap size={40} style={{ color: 'var(--accent)' }} />
+      <div className="animate-entrance" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '85vh', padding: '1.5rem', width: '100%', maxWidth: '500px', margin: '0 auto' }}>
+        {/* Waiting Room Header */}
+        <div style={{ textAlign: 'center', marginBottom: '2.5rem', marginTop: '1rem' }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', padding: '0.3rem 0.8rem', background: 'rgba(57, 255, 20, 0.1)', border: '1px solid rgba(57, 255, 20, 0.2)', borderRadius: '99px', margin: '0 auto 1rem auto' }}>
+            <Zap size={14} style={{ color: 'var(--accent)' }} />
+            <span style={{ fontSize: '10px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.2em', color: 'var(--accent)' }}>ZTILABS LOGISTICS</span>
           </div>
-          
-          <h1 style={{ fontSize: '2.2rem', marginBottom: '0.5rem', letterSpacing: '-0.02em' }}>DRIVER HUB</h1>
-          <p style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.4em', marginBottom: '3rem' }}>ZtiLabs Driver Logistics</p>
-          
-          <form onSubmit={handleDriverLogin} style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem', textAlign: 'left' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-              <label style={{ fontSize: '9px', fontWeight: 900, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Nome do Agente</label>
-              <input 
-                type="text" 
-                value={loginName} 
-                onChange={e => setLoginName(e.target.value)} 
-                className="input-premium" 
-                placeholder="Ex: Maverick X" 
-                required
-                autoFocus
-              />
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-              <label style={{ fontSize: '9px', fontWeight: 900, color: 'var(--text-muted)', textTransform: 'uppercase' }}>PIN de Segurança</label>
-              <input 
-                type="password" 
-                value={loginPass} 
-                onChange={e => setLoginPass(e.target.value)} 
-                className="input-premium" 
-                placeholder="Introduza seu código" 
-                required
-                autoComplete="current-password"
-              />
-            </div>
-            <button type="submit" disabled={isLoggingIn} className="btn-main" style={{ marginTop: '1.5rem', background: 'linear-gradient(135deg, var(--accent), #00cc66)', color: '#000' }}>
-              {isLoggingIn ? <Loader2 size={18} className="spin" /> : <span>Iniciar Jornada</span>}
-              <ArrowRight size={18} />
-            </button>
-          </form>
-
-          <div style={{ marginTop: '2.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', opacity: 0.5 }}>
-             <ShieldCheck size={14} />
-             <p style={{ fontSize: '10px', fontWeight: 700 }}>Conexão Direta e Segura</p>
-          </div>
+          <h1 style={{ fontSize: '2.2rem', fontWeight: 800, marginBottom: '0.5rem', letterSpacing: '-0.02em' }}>TELA DE ESPERA</h1>
+          <p style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.3em' }}>Selecione seu card para operar</p>
         </div>
+
+        {/* Drivers Grid */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem', width: '100%' }}>
+          {driversList.length === 0 ? (
+            <div className="card-premium" style={{ textAlign: 'center', padding: '3rem', opacity: 0.5 }}>
+              <Package size={30} style={{ marginBottom: '1rem', opacity: 0.3 }} />
+              <p style={{ fontSize: '12px' }}>Nenhum motoboy cadastrado no sistema.</p>
+            </div>
+          ) : (
+            driversList.map(dr => {
+              const driverDeliveries = deliveries.filter(d => d.driverId === dr.id);
+              const onRouteCount = driverDeliveries.filter(d => d.status === 'EM ROTA').length;
+              const deliveredCount = driverDeliveries.filter(d => d.status === 'ENTREGUE').length;
+              const todayFees = driverDeliveries
+                .filter(d => d.status === 'ENTREGUE')
+                .reduce((sum, d) => sum + (d.deliveryFee || 0), 0);
+
+              return (
+                <div 
+                  key={dr.id} 
+                  onClick={() => setSelectedDriver(dr)}
+                  className="card-premium animate-entrance hover-card" 
+                  style={{ 
+                    padding: '1.5rem', 
+                    cursor: 'pointer', 
+                    borderLeft: onRouteCount > 0 ? '4px solid var(--accent)' : '4px solid rgba(255,255,255,0.1)',
+                    transition: 'all 0.2s ease-in-out'
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.2rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <div style={{ 
+                        width: '45px', 
+                        height: '45px', 
+                        background: onRouteCount > 0 ? 'var(--accent)' : 'var(--surface-high)', 
+                        borderRadius: '12px', 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'center', 
+                        color: onRouteCount > 0 ? '#000' : 'var(--text-muted)' 
+                      }}>
+                        <User size={22} />
+                      </div>
+                      <div>
+                        <p style={{ fontWeight: 800, fontSize: '1.3rem', color: '#fff' }}>{dr.name.toUpperCase()}</p>
+                        <span style={{ 
+                          fontSize: '9px', 
+                          fontWeight: 900, 
+                          padding: '0.15rem 0.5rem', 
+                          borderRadius: '4px',
+                          background: onRouteCount > 0 ? 'rgba(57, 255, 20, 0.1)' : 'rgba(255,255,255,0.05)',
+                          color: onRouteCount > 0 ? 'var(--accent)' : 'var(--text-muted)'
+                        }}>
+                          {onRouteCount > 0 ? 'EM ROTA' : 'AGUARDANDO'}
+                        </span>
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <p style={{ fontSize: '14px', color: 'var(--accent)', fontWeight: 800 }}>R$ {todayFees.toFixed(2)}</p>
+                      <p style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Taxas de Hoje</p>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1rem' }}>
+                    <div style={{ textAlign: 'center', background: 'rgba(255,255,255,0.01)', padding: '0.5rem', borderRadius: '10px' }}>
+                      <p style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--primary)' }}>{onRouteCount}</p>
+                      <p style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Em Rota</p>
+                    </div>
+                    <div style={{ textAlign: 'center', background: 'rgba(255,255,255,0.01)', padding: '0.5rem', borderRadius: '10px' }}>
+                      <p style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--success)' }}>{deliveredCount}</p>
+                      <p style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Entregues</p>
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* PIN Keyboard Modal Overlay */}
+        {selectedDriver && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0,0,0,0.85)',
+            backdropFilter: 'blur(10px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 999,
+            padding: '1rem'
+          }}>
+            <div className="card-premium animate-entrance" style={{ width: '100%', maxWidth: '360px', padding: '2rem', textAlign: 'center' }}>
+              <h3 style={{ fontSize: '1.2rem', marginBottom: '0.5rem' }}>Acesso de Segurança</h3>
+              <p style={{ color: 'var(--accent)', fontWeight: 800, fontSize: '1.1rem', marginBottom: '1.5rem' }}>{selectedDriver.name.toUpperCase()}</p>
+              
+              {/* PIN Dots display */}
+              <div style={{ display: 'flex', justifyContent: 'center', gap: '15px', marginBottom: '2rem' }}>
+                {[0, 1, 2, 3].map((idx) => (
+                  <div 
+                    key={idx} 
+                    style={{
+                      width: '18px',
+                      height: '18px',
+                      borderRadius: '50%',
+                      border: '2px solid var(--accent)',
+                      background: pinCode.length > idx ? 'var(--accent)' : 'transparent',
+                      transition: 'all 0.1s ease'
+                    }}
+                  />
+                ))}
+              </div>
+
+              {/* Keypad */}
+              <div style={{ 
+                display: 'grid', 
+                gridTemplateColumns: 'repeat(3, 1fr)', 
+                gap: '12px', 
+                marginBottom: '1.5rem',
+                maxWidth: '280px',
+                margin: '0 auto 1.5rem auto'
+              }}>
+                {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(num => (
+                  <button 
+                    key={num} 
+                    onClick={() => handleKeypadPress(String(num))}
+                    className="btn-outline"
+                    type="button"
+                    style={{ 
+                      height: '60px', 
+                      borderRadius: '50%', 
+                      fontSize: '1.5rem', 
+                      fontWeight: 700, 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'center',
+                      border: '1px solid rgba(255,255,255,0.1)'
+                    }}
+                  >
+                    {num}
+                  </button>
+                ))}
+                <button 
+                  onClick={handleKeypadClear}
+                  className="btn-outline"
+                  type="button"
+                  style={{ 
+                    height: '60px', 
+                    borderRadius: '50%', 
+                    fontSize: '0.9rem', 
+                    fontWeight: 700, 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center',
+                    borderColor: 'rgba(255,45,85,0.2)',
+                    color: 'var(--danger)'
+                  }}
+                >
+                  Limpar
+                </button>
+                <button 
+                  onClick={() => handleKeypadPress('0')}
+                  className="btn-outline"
+                  type="button"
+                  style={{ 
+                    height: '60px', 
+                    borderRadius: '50%', 
+                    fontSize: '1.5rem', 
+                    fontWeight: 700, 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center',
+                    border: '1px solid rgba(255,255,255,0.1)'
+                  }}
+                >
+                  0
+                </button>
+                <button 
+                  onClick={() => { setSelectedDriver(null); setPinCode(""); }}
+                  className="btn-outline"
+                  type="button"
+                  style={{ 
+                    height: '60px', 
+                    borderRadius: '50%', 
+                    fontSize: '0.9rem', 
+                    fontWeight: 700, 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    color: '#fff'
+                  }}
+                >
+                  Voltar
+                </button>
+              </div>
+              
+              {isLoggingIn && (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                  <Loader2 size={16} className="spin" style={{ color: 'var(--accent)' }} />
+                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Verificando PIN...</span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -292,6 +515,11 @@ export default function DriverApp() {
       <style jsx>{`
         .spin { animation: spin 1s linear infinite; }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        .hover-card:hover {
+          transform: translateY(-2px);
+          border-color: var(--accent) !important;
+          box-shadow: 0 8px 30px rgba(57, 255, 20, 0.05);
+        }
       `}</style>
     </div>
   );
