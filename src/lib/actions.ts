@@ -328,3 +328,13 @@ export async function logoutDriver() {
   cookieStore.delete("driver_id");
   cookieStore.delete("driver_name");
 }
+
+export async function toggleDriverActive(id: string, active: boolean) {
+  const driver = await prisma.driver.update({
+    where: { id },
+    data: { isActive: active }
+  });
+  revalidatePath("/restaurant");
+  revalidatePath("/driver");
+  return driver;
+}

@@ -5,6 +5,7 @@ export interface Driver {
   name: string;
   password?: string; // Simple text password for local use
   totalFeesEarned: number;
+  isActive?: boolean;
 }
 
 export interface Delivery {

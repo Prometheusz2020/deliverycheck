@@ -492,7 +492,7 @@ export default function RestaurantPortal() {
                         value={targetDriverId}
                       >
                         <option value="">Escolha o motoboy...</option>
-                        {drivers.map(dr => (
+                        {drivers.filter(dr => dr.isActive !== false).map(dr => (
                           <option key={dr.id} value={dr.id}>{dr.name}</option>
                         ))}
                       </select>
@@ -541,11 +541,28 @@ export default function RestaurantPortal() {
                   <div key={dr.id} className="card-premium" style={{ padding: '1.5rem' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '1rem' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <div style={{ width: '45px', height: '45px', background: 'var(--accent)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#000' }}>
+                        <div style={{ width: '45px', height: '45px', background: dr.isActive !== false ? 'var(--accent)' : 'var(--surface-high)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: dr.isActive !== false ? '#000' : 'var(--text-muted)' }}>
                           <User size={24} />
                         </div>
                         <div>
-                          <p style={{ fontWeight: 800, fontSize: '1.2rem' }}>{dr.name.toUpperCase()}</p>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <p style={{ fontWeight: 800, fontSize: '1.2rem', color: dr.isActive !== false ? '#fff' : 'var(--text-muted)' }}>{dr.name.toUpperCase()}</p>
+                            <label style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', cursor: 'pointer', fontSize: '10px', fontWeight: 800 }}>
+                              <input 
+                                type="checkbox"
+                                checked={dr.isActive !== false}
+                                onChange={async (e) => {
+                                  const actions = await import("@/lib/actions");
+                                  await actions.toggleDriverActive(dr.id, e.target.checked);
+                                  fetchData();
+                                }}
+                                style={{ width: '14px', height: '14px', cursor: 'pointer', accentColor: 'var(--accent)' }}
+                              />
+                              <span style={{ color: dr.isActive !== false ? 'var(--accent)' : 'var(--text-muted)' }}>
+                                {dr.isActive !== false ? 'ATIVO HOJE' : 'INATIVO'}
+                              </span>
+                            </label>
+                          </div>
                           <p style={{ fontSize: '10px', color: 'var(--accent)', fontWeight: 900, textTransform: 'uppercase' }}>Taxas: R$ {dr.totalFeesEarned.toFixed(2)}</p>
                         </div>
                       </div>

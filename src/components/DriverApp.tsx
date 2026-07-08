@@ -302,10 +302,10 @@ export default function DriverApp() {
                 </div>
                 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', overflowY: 'auto', paddingRight: '4px' }}>
-                  {driversList.length === 0 ? (
-                    <p style={{ fontSize: '14px', color: 'var(--text-muted)', textAlign: 'center' }}>Nenhum motoboy cadastrado.</p>
+                  {driversList.filter(dr => dr.isActive !== false).length === 0 ? (
+                    <p style={{ fontSize: '14px', color: 'var(--text-muted)', textAlign: 'center' }}>Nenhum motoboy ativo para hoje.</p>
                   ) : (
-                    driversList.map(dr => (
+                    driversList.filter(dr => dr.isActive !== false).map(dr => (
                       <button
                         key={dr.id}
                         onClick={() => setSelectedDriver(dr)}
@@ -629,7 +629,35 @@ export default function DriverApp() {
                       <span style={{ fontSize: '1.3rem', fontWeight: 900, color: 'var(--accent)' }}>Delivery {delivery.orderNumber}</span>
                     </div>
                     <div>
-                      <p style={{ fontWeight: 900, fontSize: '1.5rem', color: '#fff' }}>{delivery.customerName}</p>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginBottom: '0.4rem' }}>
+                        <p style={{ fontWeight: 900, fontSize: '1.5rem', color: '#fff', margin: 0 }}>{delivery.customerName}</p>
+                        {delivery.totalAmount !== undefined && delivery.totalAmount !== null && delivery.totalAmount > 0 && (
+                          <span style={{ 
+                            fontSize: '11px', 
+                            background: 'rgba(0, 242, 255, 0.1)', 
+                            color: 'var(--primary)', 
+                            padding: '0.2rem 0.6rem', 
+                            borderRadius: '6px', 
+                            border: '1px solid rgba(0, 242, 255, 0.2)',
+                            fontWeight: 800
+                          }}>
+                            R$ {delivery.totalAmount.toFixed(2)}
+                          </span>
+                        )}
+                        {delivery.paymentMethod && (
+                          <span style={{ 
+                            fontSize: '11px', 
+                            background: 'rgba(255, 255, 255, 0.05)', 
+                            color: 'var(--text-secondary)', 
+                            padding: '0.2rem 0.6rem', 
+                            borderRadius: '6px', 
+                            border: '1px solid rgba(255, 255, 255, 0.1)',
+                            fontWeight: 800
+                          }}>
+                            {delivery.paymentMethod.toUpperCase()}
+                          </span>
+                        )}
+                      </div>
                       <p style={{ fontSize: '1.2rem', color: 'var(--text-muted)', fontWeight: 600 }}>{delivery.address || "Não informado"}</p>
                     </div>
                   </div>

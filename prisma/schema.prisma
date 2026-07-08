@@ -13,6 +13,7 @@ model Driver {
   password        String     @default("1234")
   totalFeesEarned Float      @default(0)
   deliveries      Delivery[]
+  isActive        Boolean    @default(true)
   createdAt       DateTime   @default(now())
 }
 
