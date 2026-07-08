@@ -584,22 +584,22 @@ export default function DriverApp() {
 
         {availableDeliveries.length > 0 && (
           <div>
-            <h3 style={{ fontSize: '1.2rem', color: 'var(--primary)', fontWeight: 900, textTransform: 'uppercase', marginBottom: '1.2rem', letterSpacing: '0.2em', display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <Package size={20} /> Deliveries Disponíveis
+            <h3 style={{ fontSize: '0.8rem', color: 'var(--primary)', fontWeight: 900, textTransform: 'uppercase', marginBottom: '1rem', letterSpacing: '0.2em', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Package size={14} /> Deliveries Disponíveis
             </h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
               {availableDeliveries.map(delivery => (
-                <div key={delivery.id} className="card-premium" style={{ padding: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-                    <div style={{ background: 'rgba(57, 255, 20, 0.1)', padding: '0.8rem 1.2rem', borderRadius: '10px', minWidth: '150px', textAlign: 'center' }}>
-                      <span style={{ fontSize: '1.3rem', fontWeight: 900, color: 'var(--accent)' }}>Delivery {delivery.orderNumber}</span>
+                <div key={delivery.id} className="card-premium" style={{ padding: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                    <div style={{ background: 'rgba(57, 255, 20, 0.1)', padding: '0.5rem', borderRadius: '8px', minWidth: '110px', textAlign: 'center' }}>
+                      <span style={{ fontSize: '0.9rem', fontWeight: 900, color: 'var(--accent)' }}>Delivery {delivery.orderNumber}</span>
                     </div>
                     <div>
-                      <p style={{ fontWeight: 900, fontSize: '1.5rem', color: '#fff' }}>{delivery.customerName}</p>
-                      <p style={{ fontSize: '1.2rem', color: 'var(--text-muted)', fontWeight: 600 }}>{delivery.address || "Não informado"}</p>
+                      <p style={{ fontWeight: 800, fontSize: '0.9rem', color: '#fff' }}>{delivery.customerName}</p>
+                      <p style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{delivery.address || "Não informado"}</p>
                     </div>
                   </div>
-                  <button onClick={() => handleStatusUpdate(delivery.id, 'EM ROTA')} className="btn-outline" style={{ borderColor: 'var(--primary)', color: 'var(--primary)', padding: '0.8rem 1.5rem', fontSize: '14px', fontWeight: 800 }}>
+                  <button onClick={() => handleStatusUpdate(delivery.id, 'EM ROTA')} className="btn-outline" style={{ borderColor: 'var(--primary)', color: 'var(--primary)', padding: '0.4rem 0.8rem', fontSize: '11px' }}>
                     Assumir
                   </button>
                 </div>
