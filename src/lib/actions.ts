@@ -218,7 +218,7 @@ export async function getDeliveries(dateStr?: string) {
 
   return prisma.delivery.findMany({
     where,
-    orderBy: { scannedAt: 'desc' },
+    orderBy: { scannedAt: 'asc' },
     include: { driver: true }
   });
 }

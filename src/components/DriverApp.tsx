@@ -430,10 +430,21 @@ export default function DriverApp() {
         <div>
           <h3 style={{ fontSize: '1.2rem', color: 'var(--accent)', fontWeight: 900, textTransform: 'uppercase', marginBottom: '1.2rem', letterSpacing: '0.2em', display: 'flex', alignItems: 'center', gap: '10px' }}>
             <Zap size={20} /> Entregas Ativas
+            <span style={{ 
+              background: 'rgba(57, 255, 20, 0.1)', 
+              color: 'var(--accent)', 
+              padding: '0.2rem 0.6rem', 
+              borderRadius: '6px', 
+              fontSize: '0.9rem', 
+              border: '1px solid rgba(57, 255, 20, 0.2)',
+              marginLeft: '4px'
+            }}>
+              {myDeliveries.length}
+            </span>
           </h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div className="active-deliveries-grid">
             {myDeliveries.length === 0 ? (
-              <div className="card-premium" style={{ textAlign: 'center', padding: '2rem', opacity: 0.5, borderStyle: 'dashed' }}>
+              <div className="card-premium" style={{ textAlign: 'center', padding: '2rem', opacity: 0.5, borderStyle: 'dashed', gridColumn: '1 / -1' }}>
                 <Package size={20} style={{ marginBottom: '0.5rem', opacity: 0.3 }} />
                 <p style={{ fontSize: '11px' }}>Nenhuma entrega em rota no momento.</p>
               </div>
@@ -454,6 +465,10 @@ export default function DriverApp() {
                     onClick={handleToggleMark}
                     className="card-premium animate-entrance" 
                     style={{ 
+                      padding: '1rem 1.5rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
                       borderLeft: isMarked ? '6px solid var(--success)' : '6px solid var(--accent)',
                       background: isMarked ? 'rgba(52, 199, 89, 0.08)' : 'rgba(255,255,255,0.02)',
                       borderColor: isMarked ? 'rgba(52, 199, 89, 0.4)' : undefined,
@@ -462,50 +477,19 @@ export default function DriverApp() {
                       boxShadow: isMarked ? '0 8px 30px rgba(52, 199, 89, 0.08)' : undefined
                     }}
                   >
-                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.2rem' }}>
-                       <span style={{ 
-                         fontSize: '1.6rem', 
-                         background: isMarked ? 'rgba(52, 199, 89, 0.15)' : 'rgba(57, 255, 20, 0.1)', 
-                         color: isMarked ? 'var(--success)' : 'var(--accent)', 
-                         padding: '0.6rem 1.2rem', 
-                         borderRadius: '10px', 
-                         fontWeight: 900, 
-                         border: isMarked ? '1px solid rgba(52, 199, 89, 0.25)' : '1px solid rgba(57, 255, 20, 0.2)' 
-                       }}>
-                         Delivery {delivery.orderNumber}
-                       </span>
-                       
-                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                         <span style={{ fontSize: '14px', color: isMarked ? 'var(--success)' : 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase' }}>
-                           {isMarked ? 'Marcada' : 'Em Rota'}
-                         </span>
-                         <input 
-                           type="checkbox"
-                           checked={isMarked}
-                           readOnly
-                           style={{ width: '24px', height: '24px', cursor: 'pointer', accentColor: 'var(--success)' }}
-                         />
-                       </div>
-                     </div>
-                     <p style={{ fontSize: '2rem', fontWeight: 900, marginBottom: '0.6rem', letterSpacing: '-0.02em', color: '#fff' }}>{delivery.customerName}</p>
-                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-muted)', fontSize: '1.25rem', marginBottom: '1.2rem' }}>
-                        <MapPin size={20} style={{ color: 'var(--primary)', flexShrink: 0 }} /> {delivery.address}
-                     </div>
-                      {delivery.observations && (
-                        <div style={{ 
-                          background: isMarked ? 'rgba(52, 199, 89, 0.08)' : 'rgba(57, 255, 20, 0.08)', 
-                          padding: '1.2rem', 
-                          borderRadius: '14px', 
-                          border: isMarked ? '1px solid rgba(52, 199, 89, 0.2)' : '1px solid rgba(57, 255, 20, 0.2)', 
-                          marginBottom: '1.5rem', 
-                          fontSize: '1.1rem', 
-                          color: isMarked ? 'var(--success)' : 'var(--accent)', 
-                          fontWeight: 700 
-                        }}>
-                          <MessageSquare size={18} style={{ marginRight: '8px', display: 'inline', verticalAlign: 'middle' }} />
-                          {delivery.observations}
-                        </div>
-                      )}
+                    <span style={{ 
+                      fontSize: '1.4rem', 
+                      fontWeight: 900, 
+                      color: isMarked ? 'var(--success)' : 'var(--accent)'
+                    }}>
+                      Delivery {delivery.orderNumber}
+                    </span>
+                    <input 
+                      type="checkbox"
+                      checked={isMarked}
+                      readOnly
+                      style={{ width: '22px', height: '22px', cursor: 'pointer', accentColor: 'var(--success)' }}
+                    />
                   </div>
                 );
               })
@@ -611,8 +595,8 @@ export default function DriverApp() {
                       <span style={{ fontSize: '1.3rem', fontWeight: 900, color: 'var(--accent)' }}>Delivery {delivery.orderNumber}</span>
                     </div>
                     <div>
-                      <p style={{ fontWeight: 900, fontSize: '1.3rem' }}>{delivery.customerName}</p>
-                      <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>{(delivery.address || "").slice(0, 45)}...</p>
+                      <p style={{ fontWeight: 900, fontSize: '1.5rem', color: '#fff' }}>{delivery.customerName}</p>
+                      <p style={{ fontSize: '1.2rem', color: 'var(--text-muted)', fontWeight: 600 }}>{delivery.address || "Não informado"}</p>
                     </div>
                   </div>
                   <button onClick={() => handleStatusUpdate(delivery.id, 'EM ROTA')} className="btn-outline" style={{ borderColor: 'var(--primary)', color: 'var(--primary)', padding: '0.8rem 1.5rem', fontSize: '14px', fontWeight: 800 }}>
@@ -642,6 +626,22 @@ export default function DriverApp() {
         @media (min-width: 600px) {
           .drivers-grid {
             grid-template-columns: repeat(2, 1fr);
+          }
+        }
+        .active-deliveries-grid {
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: 0.8rem;
+          width: 100%;
+        }
+        @media (min-width: 480px) {
+          .active-deliveries-grid {
+            grid-template-columns: repeat(2, 1fr);
+          }
+        }
+        @media (min-width: 768px) {
+          .active-deliveries-grid {
+            grid-template-columns: repeat(3, 1fr);
           }
         }
       `}</style>
