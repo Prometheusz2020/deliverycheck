@@ -27,6 +27,8 @@ export default function RestaurantPortal() {
   const [selectedDeliveryIds, setSelectedDeliveryIds] = useState<string[]>([]);
   const [targetDriverId, setTargetDriverId] = useState("");
   const [isAssigning, setIsAssigning] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [finishedLimit, setFinishedLimit] = useState(10);
 
   const hasValidAddress = (address?: string) => {
     if (!address) return false;
@@ -185,11 +187,17 @@ export default function RestaurantPortal() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
           {/* Painel de Filtros e Resumo */}
           {(() => {
-            const filteredDeliveries = onlyWithAddress
-              ? deliveries.filter(d => hasValidAddress(d.address))
-              : deliveries;
+            const filteredDeliveries = deliveries.filter(d => {
+              const matchesAddress = onlyWithAddress ? hasValidAddress(d.address) : true;
+              const matchesSearch = searchTerm 
+                ? (d.customerName?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                   d.address?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                   d.orderNumber?.toLowerCase().includes(searchTerm.toLowerCase()))
+                : true;
+              return matchesAddress && matchesSearch;
+            });
             const totalCount = deliveries.length;
-            const hiddenCount = totalCount - filteredDeliveries.length;
+            const hiddenCount = totalCount - deliveries.filter(d => hasValidAddress(d.address)).length;
             
             const unassigned = filteredDeliveries.filter(d => !d.driverId);
             const allUnassignedSelected = unassigned.length > 0 && unassigned.every(d => selectedDeliveryIds.includes(d.id));
@@ -206,7 +214,7 @@ export default function RestaurantPortal() {
             return (
               <>
                 <div className="card-premium" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
                     <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)' }}>
                       Mostrando <strong style={{ color: 'var(--primary)' }}>{filteredDeliveries.length}</strong> de <strong>{totalCount}</strong> comandas
                       {hiddenCount > 0 && (
@@ -215,6 +223,14 @@ export default function RestaurantPortal() {
                         </span>
                       )}
                     </span>
+                    <input 
+                      type="text"
+                      placeholder="Buscar por cliente, endereço ou delivery..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="input-premium"
+                      style={{ maxWidth: '320px', fontSize: '12px', padding: '0.4rem 0.8rem', border: '1px solid rgba(255,255,255,0.08)' }}
+                    />
                   </div>
                   
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -251,6 +267,7 @@ export default function RestaurantPortal() {
                             <th>Comanda</th>
                             <th>Cliente</th>
                             <th>Recebido Há</th>
+                            <th style={{ width: '180px' }}>Atribuir Motoboy</th>
                             <th>Ação</th>
                           </tr>
                         </thead>
@@ -280,6 +297,19 @@ export default function RestaurantPortal() {
                                 <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
                                   {formatScannedTime(delivery.scannedAt)}
                                 </span>
+                              </td>
+                              <td>
+                                <select 
+                                  className="input-premium" 
+                                  style={{ padding: '0.3rem 0.6rem', fontSize: '11px', width: '160px', border: '1px solid rgba(255, 255, 255, 0.1)', cursor: 'pointer' }}
+                                  onChange={(e) => handleTransfer(delivery.id, e.target.value)}
+                                  value=""
+                                >
+                                  <option value="">Enviar para...</option>
+                                  {drivers.filter(dr => dr.isActive).map(dr => (
+                                    <option key={dr.id} value={dr.id}>{dr.name}</option>
+                                  ))}
+                                </select>
                               </td>
                               <td>
                                 <button 
@@ -338,6 +368,7 @@ export default function RestaurantPortal() {
                               <th>Comanda</th>
                               <th>Cliente</th>
                               <th>Status</th>
+                              <th style={{ width: '180px' }}>Reatribuir Motoboy</th>
                               <th>Obs / Notas</th>
                               <th>Ações</th>
                             </tr>
@@ -383,6 +414,19 @@ export default function RestaurantPortal() {
                                   </div>
                                 </td>
                                 <td>
+                                  <select 
+                                    className="input-premium" 
+                                    style={{ padding: '0.3rem 0.6rem', fontSize: '11px', width: '160px', border: '1px solid rgba(255, 255, 255, 0.1)', cursor: 'pointer' }}
+                                    onChange={(e) => handleTransfer(delivery.id, e.target.value)}
+                                    value={driver.id || ""}
+                                  >
+                                    {drivers.filter(dr => dr.isActive || dr.id === driver.id).map(dr => (
+                                      <option key={dr.id} value={dr.id}>{dr.name} {!dr.isActive ? '(Inativo)' : ''}</option>
+                                    ))}
+                                    <option value="unassigned">Retirar Motoboy (Pendente)</option>
+                                  </select>
+                                </td>
+                                <td>
                                   <input 
                                     type="text" 
                                     placeholder="Add nota..." 
@@ -416,37 +460,53 @@ export default function RestaurantPortal() {
                 })}
 
                 {/* Show Recent Finished */}
-                <div className="card-premium" style={{ opacity: 0.8 }}>
-                  <h3 style={{ marginBottom: '1rem', color: 'var(--success)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Package size={16} /> FINALIZADAS RECENTEMENTE
-                  </h3>
-                  <div className="table-wrapper">
-                      <table className="table-premium">
-                        <thead>
-                          <tr>
-                            <th>Comanda</th>
-                            <th>Cliente</th>
-                            <th>Motoboy</th>
-                            <th>Tempo de Entrega</th>
-                            <th>Status</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {filteredDeliveries.filter(d => d.status === 'ENTREGUE').slice(0, 10).map(delivery => (
-                            <tr key={delivery.id}>
-                              <td style={{ fontWeight: 800, color: 'var(--text-muted)' }}>Comanda {delivery.orderNumber}</td>
-                              <td>{delivery.customerName}</td>
-                              <td style={{ color: 'var(--text-muted)', fontSize: '11px' }}>por {delivery.deliveryPerson}</td>
-                              <td style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                                {delivery.deliveredAt ? getDeliveryDuration(delivery.scannedAt, delivery.deliveredAt) : '--'}
-                              </td>
-                              <td style={{ color: 'var(--success)', fontWeight: 800 }}>ENTREGUE</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                  </div>
-                </div>
+                 {(() => {
+                   const finishedDeliveries = filteredDeliveries.filter(d => d.status === 'ENTREGUE');
+                   return (
+                     <div className="card-premium" style={{ opacity: 0.8 }}>
+                       <h3 style={{ marginBottom: '1rem', color: 'var(--success)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                         <Package size={16} /> FINALIZADAS ({finishedDeliveries.length})
+                       </h3>
+                       <div className="table-wrapper">
+                           <table className="table-premium">
+                             <thead>
+                               <tr>
+                                 <th>Comanda</th>
+                                 <th>Cliente</th>
+                                 <th>Motoboy</th>
+                                 <th>Tempo de Entrega</th>
+                                 <th>Status</th>
+                               </tr>
+                             </thead>
+                             <tbody>
+                               {finishedDeliveries.slice(0, finishedLimit).map(delivery => (
+                                 <tr key={delivery.id}>
+                                   <td style={{ fontWeight: 800, color: 'var(--text-muted)' }}>Comanda {delivery.orderNumber}</td>
+                                   <td>{delivery.customerName}</td>
+                                   <td style={{ color: 'var(--text-muted)', fontSize: '11px' }}>por {delivery.deliveryPerson}</td>
+                                   <td style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                                     {delivery.deliveredAt ? getDeliveryDuration(delivery.scannedAt, delivery.deliveredAt) : '--'}
+                                   </td>
+                                   <td style={{ color: 'var(--success)', fontWeight: 800 }}>ENTREGUE</td>
+                                 </tr>
+                               ))}
+                             </tbody>
+                           </table>
+                       </div>
+                       {finishedDeliveries.length > finishedLimit && (
+                         <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1rem' }}>
+                           <button 
+                             onClick={() => setFinishedLimit(prev => prev + 20)} 
+                             className="btn-outline" 
+                             style={{ padding: '0.6rem 2rem', fontSize: '12px' }}
+                           >
+                             Carregar Mais Entregas
+                           </button>
+                         </div>
+                       )}
+                     </div>
+                   );
+                 })()}
 
                 {/* Sticky Bottom Bar for Bulk Action */}
                 {selectedDeliveryIds.length > 0 && (
@@ -492,7 +552,7 @@ export default function RestaurantPortal() {
                         value={targetDriverId}
                       >
                         <option value="">Escolha o motoboy...</option>
-                        {drivers.filter(dr => dr.isActive !== false).map(dr => (
+                        {drivers.filter(dr => dr.isActive).map(dr => (
                           <option key={dr.id} value={dr.id}>{dr.name}</option>
                         ))}
                       </select>
@@ -541,25 +601,35 @@ export default function RestaurantPortal() {
                   <div key={dr.id} className="card-premium" style={{ padding: '1.5rem' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '1rem' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <div style={{ width: '45px', height: '45px', background: dr.isActive !== false ? 'var(--accent)' : 'var(--surface-high)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: dr.isActive !== false ? '#000' : 'var(--text-muted)' }}>
+                        <div style={{ width: '45px', height: '45px', background: dr.isActive ? 'var(--accent)' : 'var(--surface-high)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: dr.isActive ? '#000' : 'var(--text-muted)' }}>
                           <User size={24} />
                         </div>
                         <div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <p style={{ fontWeight: 800, fontSize: '1.2rem', color: dr.isActive !== false ? '#fff' : 'var(--text-muted)' }}>{dr.name.toUpperCase()}</p>
+                            <p style={{ fontWeight: 800, fontSize: '1.2rem', color: dr.isActive ? '#fff' : 'var(--text-muted)' }}>{dr.name.toUpperCase()}</p>
                             <label style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', cursor: 'pointer', fontSize: '10px', fontWeight: 800 }}>
                               <input 
                                 type="checkbox"
-                                checked={dr.isActive !== false}
+                                checked={!!dr.isActive}
                                 onChange={async (e) => {
-                                  const actions = await import("@/lib/actions");
-                                  await actions.toggleDriverActive(dr.id, e.target.checked);
-                                  fetchData();
+                                  const checked = e.target.checked;
+                                  // Update state optimistically
+                                  setDrivers(prev => prev.map(d => d.id === dr.id ? { ...d, isActive: checked } : d));
+                                  try {
+                                    const actions = await import("@/lib/actions");
+                                    await actions.toggleDriverActive(dr.id, checked);
+                                    fetchData();
+                                  } catch (err) {
+                                    console.error(err);
+                                    // Revert if error
+                                    setDrivers(prev => prev.map(d => d.id === dr.id ? { ...d, isActive: !checked } : d));
+                                    alert("Erro ao alterar o status do motorista.");
+                                  }
                                 }}
                                 style={{ width: '14px', height: '14px', cursor: 'pointer', accentColor: 'var(--accent)' }}
                               />
-                              <span style={{ color: dr.isActive !== false ? 'var(--accent)' : 'var(--text-muted)' }}>
-                                {dr.isActive !== false ? 'ATIVO HOJE' : 'INATIVO'}
+                              <span style={{ color: dr.isActive ? 'var(--accent)' : 'var(--text-muted)' }}>
+                                {dr.isActive ? 'ATIVO HOJE' : 'INATIVO'}
                               </span>
                             </label>
                           </div>

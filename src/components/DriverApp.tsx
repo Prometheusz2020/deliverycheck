@@ -302,10 +302,10 @@ export default function DriverApp() {
                 </div>
                 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', overflowY: 'auto', paddingRight: '4px' }}>
-                  {driversList.filter(dr => dr.isActive !== false).length === 0 ? (
+                  {driversList.filter(dr => dr.isActive).length === 0 ? (
                     <p style={{ fontSize: '14px', color: 'var(--text-muted)', textAlign: 'center' }}>Nenhum motoboy ativo para hoje.</p>
                   ) : (
-                    driversList.filter(dr => dr.isActive !== false).map(dr => (
+                    driversList.filter(dr => dr.isActive).map(dr => (
                       <button
                         key={dr.id}
                         onClick={() => setSelectedDriver(dr)}

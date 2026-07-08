@@ -142,6 +142,20 @@ export async function bulkCompleteDeliveries(deliveryIds: string[], driverId: st
 }
 
 export async function reassignDelivery(deliveryId: string, newDriverId: string) {
+  if (newDriverId === "unassigned" || !newDriverId) {
+    await prisma.delivery.update({
+      where: { id: deliveryId },
+      data: {
+        driverId: null,
+        deliveryPerson: null,
+        status: "PENDENTE"
+      }
+    });
+    revalidatePath("/restaurant");
+    revalidatePath("/driver");
+    return;
+  }
+
   const driver = await prisma.driver.findUnique({ where: { id: newDriverId } });
   if (!driver) return;
 
