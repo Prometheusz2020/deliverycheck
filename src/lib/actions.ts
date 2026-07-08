@@ -111,6 +111,36 @@ export async function updateDeliveryStatus(id: string, status: DeliveryStatus, d
   revalidatePath("/driver");
 }
 
+export async function bulkCompleteDeliveries(deliveryIds: string[], driverId: string) {
+  await prisma.$transaction(async (tx) => {
+    const deliveries = await tx.delivery.findMany({
+      where: { id: { in: deliveryIds } }
+    });
+
+    const notDeliveredYet = deliveries.filter(d => d.status !== "ENTREGUE");
+    const totalFees = notDeliveredYet.reduce((sum, d) => sum + (d.deliveryFee || 0), 0);
+
+    await tx.delivery.updateMany({
+      where: { id: { in: deliveryIds } },
+      data: {
+        status: "ENTREGUE",
+        deliveredAt: new Date()
+      }
+    });
+
+    if (totalFees > 0) {
+      await tx.driver.update({
+        where: { id: driverId },
+        data: { totalFeesEarned: { increment: totalFees } }
+      });
+    }
+  });
+
+  revalidatePath("/restaurant");
+  revalidatePath("/driver");
+  return { success: true };
+}
+
 export async function reassignDelivery(deliveryId: string, newDriverId: string) {
   const driver = await prisma.driver.findUnique({ where: { id: newDriverId } });
   if (!driver) return;

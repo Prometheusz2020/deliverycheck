@@ -316,3 +316,12 @@ h1, h2, h3, h4 {
   background: rgba(255, 45, 85, 0.15) !important;
   border-color: var(--danger) !important;
 }
+
+@media (min-width: 600px) {
+  .pin-btn {
+    width: 85px !important;
+    height: 85px !important;
+    font-size: 2.2rem !important;
+  }
+}
+

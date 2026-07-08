@@ -29,6 +29,8 @@ export default function DriverApp() {
   const [selectedDriver, setSelectedDriver] = useState<Driver | null>(null);
   const [pinCode, setPinCode] = useState("");
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [markedDeliveryIds, setMarkedDeliveryIds] = useState<string[]>([]);
+  const [isCompleting, setIsCompleting] = useState(false);
 
   const fetchData = async () => {
     try {
@@ -170,21 +172,41 @@ export default function DriverApp() {
     fetchData();
   };
 
+  const handleBulkComplete = async () => {
+    if (!driver || markedDeliveryIds.length === 0) return;
+    setIsCompleting(true);
+    try {
+      const actions = await import("@/lib/actions");
+      const res = await actions.bulkCompleteDeliveries(markedDeliveryIds, driver.id);
+      if (res.success) {
+        setMarkedDeliveryIds([]);
+        fetchData();
+      } else {
+        alert("Erro ao confirmar entregas.");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Erro de conexão.");
+    } finally {
+      setIsCompleting(false);
+    }
+  };
+
   if (!driver) {
     return (
-      <div className="animate-entrance" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '85vh', padding: '1.5rem', width: '100%', maxWidth: '500px', margin: '0 auto' }}>
+      <div className="animate-entrance" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '85vh', padding: '1.5rem', width: '100%', maxWidth: '800px', margin: '0 auto' }}>
         {/* Waiting Room Header */}
         <div style={{ textAlign: 'center', marginBottom: '2.5rem', marginTop: '1rem' }}>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', padding: '0.3rem 0.8rem', background: 'rgba(57, 255, 20, 0.1)', border: '1px solid rgba(57, 255, 20, 0.2)', borderRadius: '99px', margin: '0 auto 1rem auto' }}>
             <Zap size={14} style={{ color: 'var(--accent)' }} />
             <span style={{ fontSize: '10px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.2em', color: 'var(--accent)' }}>ZTILABS LOGISTICS</span>
           </div>
-          <h1 style={{ fontSize: '2.2rem', fontWeight: 800, marginBottom: '0.5rem', letterSpacing: '-0.02em' }}>TELA DE ESPERA</h1>
-          <p style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.3em' }}>Selecione seu card para operar</p>
+          <h1 style={{ fontSize: '3rem', fontWeight: 900, marginBottom: '0.5rem', letterSpacing: '-0.02em' }}>TELA DE ESPERA</h1>
+          <p style={{ fontSize: '16px', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.3em' }}>Selecione seu card para operar</p>
         </div>
 
         {/* Drivers Grid */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem', width: '100%' }}>
+        <div className="drivers-grid">
           {driversList.length === 0 ? (
             <div className="card-premium" style={{ textAlign: 'center', padding: '3rem', opacity: 0.5 }}>
               <Package size={30} style={{ marginBottom: '1rem', opacity: 0.3 }} />
@@ -205,17 +227,17 @@ export default function DriverApp() {
                   onClick={() => setSelectedDriver(dr)}
                   className="card-premium animate-entrance hover-card" 
                   style={{ 
-                    padding: '1.5rem', 
+                    padding: '2rem', 
                     cursor: 'pointer', 
-                    borderLeft: onRouteCount > 0 ? '4px solid var(--accent)' : '4px solid rgba(255,255,255,0.1)',
+                    borderLeft: onRouteCount > 0 ? '6px solid var(--accent)' : '6px solid rgba(255,255,255,0.1)',
                     transition: 'all 0.2s ease-in-out'
                   }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.2rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                       <div style={{ 
-                        width: '45px', 
-                        height: '45px', 
+                        width: '55px', 
+                        height: '55px', 
                         background: onRouteCount > 0 ? 'var(--accent)' : 'var(--surface-high)', 
                         borderRadius: '12px', 
                         display: 'flex', 
@@ -223,15 +245,15 @@ export default function DriverApp() {
                         justifyContent: 'center', 
                         color: onRouteCount > 0 ? '#000' : 'var(--text-muted)' 
                       }}>
-                        <User size={22} />
+                        <User size={28} />
                       </div>
                       <div>
-                        <p style={{ fontWeight: 800, fontSize: '1.3rem', color: '#fff' }}>{dr.name.toUpperCase()}</p>
+                        <p style={{ fontWeight: 800, fontSize: '1.8rem', color: '#fff', lineHeight: 1.1 }}>{dr.name.toUpperCase()}</p>
                         <span style={{ 
-                          fontSize: '9px', 
+                          fontSize: '12px', 
                           fontWeight: 900, 
-                          padding: '0.15rem 0.5rem', 
-                          borderRadius: '4px',
+                          padding: '0.3rem 0.7rem', 
+                          borderRadius: '6px',
                           background: onRouteCount > 0 ? 'rgba(57, 255, 20, 0.1)' : 'rgba(255,255,255,0.05)',
                           color: onRouteCount > 0 ? 'var(--accent)' : 'var(--text-muted)'
                         }}>
@@ -240,19 +262,19 @@ export default function DriverApp() {
                       </div>
                     </div>
                     <div style={{ textAlign: 'right' }}>
-                      <p style={{ fontSize: '14px', color: 'var(--accent)', fontWeight: 800 }}>R$ {todayFees.toFixed(2)}</p>
-                      <p style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Taxas de Hoje</p>
+                      <p style={{ fontSize: '20px', color: 'var(--accent)', fontWeight: 900 }}>R$ {todayFees.toFixed(2)}</p>
+                      <p style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>Taxas de Hoje</p>
                     </div>
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1rem' }}>
-                    <div style={{ textAlign: 'center', background: 'rgba(255,255,255,0.01)', padding: '0.5rem', borderRadius: '10px' }}>
-                      <p style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--primary)' }}>{onRouteCount}</p>
-                      <p style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Em Rota</p>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1.2rem' }}>
+                    <div style={{ textAlign: 'center', background: 'rgba(255,255,255,0.02)', padding: '0.8rem', borderRadius: '12px' }}>
+                      <p style={{ fontSize: '1.5rem', fontWeight: 900, color: 'var(--primary)' }}>{onRouteCount}</p>
+                      <p style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>Em Rota</p>
                     </div>
-                    <div style={{ textAlign: 'center', background: 'rgba(255,255,255,0.01)', padding: '0.5rem', borderRadius: '10px' }}>
-                      <p style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--success)' }}>{deliveredCount}</p>
-                      <p style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Entregues</p>
+                    <div style={{ textAlign: 'center', background: 'rgba(255,255,255,0.02)', padding: '0.8rem', borderRadius: '12px' }}>
+                      <p style={{ fontSize: '1.5rem', fontWeight: 900, color: 'var(--success)' }}>{deliveredCount}</p>
+                      <p style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>Entregues</p>
                     </div>
                   </div>
                 </div>
@@ -323,9 +345,9 @@ export default function DriverApp() {
               <div style={{ 
                 display: 'grid', 
                 gridTemplateColumns: 'repeat(3, 1fr)', 
-                gap: '16px', 
+                gap: '20px', 
                 marginBottom: '2rem',
-                maxWidth: '280px',
+                maxWidth: '340px',
                 margin: '0 auto 2rem auto',
                 justifyItems: 'center'
               }}>
@@ -388,26 +410,26 @@ export default function DriverApp() {
   const availableDeliveries = deliveries.filter(d => !d.driverId && d.status === 'PENDENTE');
 
   return (
-    <div className="page-container animate-entrance" style={{ maxWidth: '600px', marginTop: '1rem' }}>
+    <div className="page-container animate-entrance" style={{ maxWidth: '850px', marginTop: '1rem' }}>
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', padding: '1rem', background: 'var(--surface-high)', borderRadius: '20px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div style={{ width: '40px', height: '40px', background: 'var(--accent)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#000' }}>
-            <User size={20} />
+          <div style={{ width: '50px', height: '50px', background: 'var(--accent)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#000' }}>
+            <User size={24} />
           </div>
           <div>
-            <p style={{ fontSize: '10px', fontWeight: 900, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Agente</p>
-            <p style={{ fontWeight: 800, fontSize: '1.1rem' }}>{driver.name}</p>
+            <p style={{ fontSize: '12px', fontWeight: 900, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Agente</p>
+            <p style={{ fontWeight: 800, fontSize: '1.5rem' }}>{driver.name}</p>
           </div>
         </div>
-        <button onClick={handleLogout} className="btn-outline" style={{ padding: '0.6rem', color: 'var(--danger)', borderColor: 'rgba(255,45,85,0.2)' }}>
-          <LogOut size={18} />
+        <button onClick={handleLogout} className="btn-outline" style={{ padding: '0.8rem', color: 'var(--danger)', borderColor: 'rgba(255,45,85,0.2)' }}>
+          <LogOut size={22} />
         </button>
       </header>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', paddingBottom: '3rem' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem', paddingBottom: '3rem' }}>
         <div>
-          <h3 style={{ fontSize: '0.8rem', color: 'var(--accent)', fontWeight: 900, textTransform: 'uppercase', marginBottom: '1rem', letterSpacing: '0.2em', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Zap size={14} /> Entregas Ativas
+          <h3 style={{ fontSize: '1.2rem', color: 'var(--accent)', fontWeight: 900, textTransform: 'uppercase', marginBottom: '1.2rem', letterSpacing: '0.2em', display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <Zap size={20} /> Entregas Ativas
           </h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             {myDeliveries.length === 0 ? (
@@ -416,47 +438,159 @@ export default function DriverApp() {
                 <p style={{ fontSize: '11px' }}>Nenhuma entrega em rota no momento.</p>
               </div>
             ) : (
-              myDeliveries.map(delivery => (
-                <div key={delivery.id} className="card-premium animate-entrance" style={{ borderLeft: '4px solid var(--accent)' }}>
-                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                     <span style={{ fontSize: '1.2rem', background: 'rgba(57, 255, 20, 0.1)', color: 'var(--accent)', padding: '0.4rem 0.8rem', borderRadius: '8px', fontWeight: 900, border: '1px solid rgba(57, 255, 20, 0.2)' }}>
-                       Comanda {delivery.orderNumber}
-                     </span>
-                     <span style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Em Rota</span>
-                   </div>
-                   <p style={{ fontSize: '1.3rem', fontWeight: 800, marginBottom: '0.5rem', letterSpacing: '-0.02em' }}>{delivery.customerName}</p>
-                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '0.8rem' }}>
-                      <MapPin size={14} /> {delivery.address}
-                   </div>
-                    {delivery.observations && (
-                      <div style={{ background: 'rgba(57, 255, 20, 0.05)', padding: '0.8rem', borderRadius: '12px', border: '1px solid rgba(57, 255, 20, 0.1)', marginBottom: '1.2rem', fontSize: '0.8rem', color: 'var(--accent)', fontWeight: 600 }}>
-                        <MessageSquare size={14} style={{ marginRight: '6px', verticalAlign: 'middle' }} />
-                        {delivery.observations}
-                      </div>
-                    )}
-                   <button onClick={() => handleStatusUpdate(delivery.id, 'ENTREGUE')} className="btn-main" style={{ width: '100%', background: 'var(--success)', border: 'none', height: '50px', fontSize: '0.9rem' }}>
-                     <CheckCircle size={20} /> Confirmar Entrega
-                   </button>
-                </div>
-              ))
+              myDeliveries.map(delivery => {
+                const isMarked = markedDeliveryIds.includes(delivery.id);
+                const handleToggleMark = () => {
+                  if (isMarked) {
+                    setMarkedDeliveryIds(prev => prev.filter(id => id !== delivery.id));
+                  } else {
+                    setMarkedDeliveryIds(prev => [...prev, delivery.id]);
+                  }
+                };
+
+                return (
+                  <div 
+                    key={delivery.id} 
+                    onClick={handleToggleMark}
+                    className="card-premium animate-entrance" 
+                    style={{ 
+                      borderLeft: isMarked ? '6px solid var(--success)' : '6px solid var(--accent)',
+                      background: isMarked ? 'rgba(52, 199, 89, 0.08)' : 'rgba(255,255,255,0.02)',
+                      borderColor: isMarked ? 'rgba(52, 199, 89, 0.4)' : undefined,
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease-in-out',
+                      boxShadow: isMarked ? '0 8px 30px rgba(52, 199, 89, 0.08)' : undefined
+                    }}
+                  >
+                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.2rem' }}>
+                       <span style={{ 
+                         fontSize: '1.6rem', 
+                         background: isMarked ? 'rgba(52, 199, 89, 0.15)' : 'rgba(57, 255, 20, 0.1)', 
+                         color: isMarked ? 'var(--success)' : 'var(--accent)', 
+                         padding: '0.6rem 1.2rem', 
+                         borderRadius: '10px', 
+                         fontWeight: 900, 
+                         border: isMarked ? '1px solid rgba(52, 199, 89, 0.25)' : '1px solid rgba(57, 255, 20, 0.2)' 
+                       }}>
+                         Delivery {delivery.orderNumber}
+                       </span>
+                       
+                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                         <span style={{ fontSize: '14px', color: isMarked ? 'var(--success)' : 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase' }}>
+                           {isMarked ? 'Marcada' : 'Em Rota'}
+                         </span>
+                         <input 
+                           type="checkbox"
+                           checked={isMarked}
+                           readOnly
+                           style={{ width: '24px', height: '24px', cursor: 'pointer', accentColor: 'var(--success)' }}
+                         />
+                       </div>
+                     </div>
+                     <p style={{ fontSize: '2rem', fontWeight: 900, marginBottom: '0.6rem', letterSpacing: '-0.02em', color: '#fff' }}>{delivery.customerName}</p>
+                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-muted)', fontSize: '1.25rem', marginBottom: '1.2rem' }}>
+                        <MapPin size={20} style={{ color: 'var(--primary)', flexShrink: 0 }} /> {delivery.address}
+                     </div>
+                      {delivery.observations && (
+                        <div style={{ 
+                          background: isMarked ? 'rgba(52, 199, 89, 0.08)' : 'rgba(57, 255, 20, 0.08)', 
+                          padding: '1.2rem', 
+                          borderRadius: '14px', 
+                          border: isMarked ? '1px solid rgba(52, 199, 89, 0.2)' : '1px solid rgba(57, 255, 20, 0.2)', 
+                          marginBottom: '1.5rem', 
+                          fontSize: '1.1rem', 
+                          color: isMarked ? 'var(--success)' : 'var(--accent)', 
+                          fontWeight: 700 
+                        }}>
+                          <MessageSquare size={18} style={{ marginRight: '8px', display: 'inline', verticalAlign: 'middle' }} />
+                          {delivery.observations}
+                        </div>
+                      )}
+                  </div>
+                );
+              })
             )}
           </div>
+          
+          {/* Confirmação em Lote */}
+          {myDeliveries.length > 0 && markedDeliveryIds.length > 0 && (
+            <div style={{
+              position: 'sticky',
+              bottom: '20px',
+              zIndex: 99,
+              background: 'rgba(10, 25, 15, 0.96)',
+              border: '3px solid var(--success)',
+              borderRadius: '20px',
+              padding: '1.5rem',
+              boxShadow: '0 12px 40px rgba(52, 199, 89, 0.4)',
+              backdropFilter: 'blur(15px)',
+              WebkitBackdropFilter: 'blur(15px)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '12px',
+              marginTop: '1.5rem',
+              animation: 'slideUp 0.3s ease-out'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '1.2rem', fontWeight: 900, color: '#fff' }}>
+                  {markedDeliveryIds.length} {markedDeliveryIds.length === 1 ? 'delivery marcado' : 'deliveries marcados'}
+                </span>
+                <button 
+                  onClick={(e) => { e.stopPropagation(); setMarkedDeliveryIds([]); }}
+                  className="btn-outline" 
+                  style={{ padding: '0.5rem 1rem', fontSize: '13px', borderColor: 'rgba(255,255,255,0.2)', height: 'auto', color: 'var(--text-muted)', fontWeight: 800 }}
+                >
+                  Desmarcar Todas
+                </button>
+              </div>
+              
+              <button 
+                onClick={handleBulkComplete}
+                disabled={isCompleting}
+                className="btn-main" 
+                style={{ 
+                  width: '100%', 
+                  background: 'var(--success)', 
+                  border: 'none', 
+                  height: '65px', 
+                  fontSize: '1.3rem',
+                  fontWeight: 900,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '12px'
+                }}
+              >
+                {isCompleting ? (
+                  <>
+                    <Loader2 size={26} className="spin" />
+                    <span>Confirmando...</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle size={26} />
+                    <span>Confirmar Entregas Selecionadas</span>
+                  </>
+                )}
+              </button>
+            </div>
+          )}
         </div>
-
+        
         {finishedDeliveries.length > 0 && (
           <div>
-            <h3 style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 900, textTransform: 'uppercase', marginBottom: '1rem', letterSpacing: '0.2em', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <CheckCircle size={14} /> Histórico de Hoje
+            <h3 style={{ fontSize: '1.2rem', color: 'var(--text-muted)', fontWeight: 900, textTransform: 'uppercase', marginBottom: '1.2rem', letterSpacing: '0.2em', display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <CheckCircle size={20} /> Histórico de Hoje
             </h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
               {finishedDeliveries.map(delivery => (
-                <div key={delivery.id} className="card-premium" style={{ padding: '0.8rem 1.2rem', opacity: 0.7, background: 'rgba(57, 255, 20, 0.02)' }}>
+                <div key={delivery.id} className="card-premium" style={{ padding: '1.2rem 1.5rem', opacity: 0.7, background: 'rgba(57, 255, 20, 0.02)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
-                      <p style={{ fontWeight: 700, fontSize: '0.9rem' }}>{delivery.customerName}</p>
-                      <p style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{delivery.orderNumber} • Finalizado às {delivery.deliveredAt ? new Date(delivery.deliveredAt!).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '--:--'}</p>
+                      <p style={{ fontWeight: 800, fontSize: '1.2rem' }}>{delivery.customerName}</p>
+                      <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Delivery {delivery.orderNumber} • Finalizado às {delivery.deliveredAt ? new Date(delivery.deliveredAt!).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '--:--'}</p>
                     </div>
-                    <p style={{ fontWeight: 800, color: 'var(--text-muted)', fontSize: '0.9rem' }}>Finalizado às {delivery.deliveredAt ? new Date(delivery.deliveredAt!).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '--:--'}</p>
+                    <p style={{ fontWeight: 800, color: 'var(--text-muted)', fontSize: '1.1rem' }}>Finalizado às {delivery.deliveredAt ? new Date(delivery.deliveredAt!).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '--:--'}</p>
                   </div>
                 </div>
               ))}
@@ -466,22 +600,22 @@ export default function DriverApp() {
 
         {availableDeliveries.length > 0 && (
           <div>
-            <h3 style={{ fontSize: '0.8rem', color: 'var(--primary)', fontWeight: 900, textTransform: 'uppercase', marginBottom: '1rem', letterSpacing: '0.2em', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Package size={14} /> Comandas Disponíveis
+            <h3 style={{ fontSize: '1.2rem', color: 'var(--primary)', fontWeight: 900, textTransform: 'uppercase', marginBottom: '1.2rem', letterSpacing: '0.2em', display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <Package size={20} /> Deliveries Disponíveis
             </h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
               {availableDeliveries.map(delivery => (
-                <div key={delivery.id} className="card-premium" style={{ padding: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                    <div style={{ background: 'rgba(57, 255, 20, 0.1)', padding: '0.5rem', borderRadius: '8px', minWidth: '110px', textAlign: 'center' }}>
-                      <span style={{ fontSize: '0.9rem', fontWeight: 900, color: 'var(--accent)' }}>Comanda {delivery.orderNumber}</span>
+                <div key={delivery.id} className="card-premium" style={{ padding: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+                    <div style={{ background: 'rgba(57, 255, 20, 0.1)', padding: '0.8rem 1.2rem', borderRadius: '10px', minWidth: '150px', textAlign: 'center' }}>
+                      <span style={{ fontSize: '1.3rem', fontWeight: 900, color: 'var(--accent)' }}>Delivery {delivery.orderNumber}</span>
                     </div>
                     <div>
-                      <p style={{ fontWeight: 800, fontSize: '0.9rem' }}>{delivery.customerName}</p>
-                      <p style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{(delivery.address || "").slice(0, 35)}...</p>
+                      <p style={{ fontWeight: 900, fontSize: '1.3rem' }}>{delivery.customerName}</p>
+                      <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>{(delivery.address || "").slice(0, 45)}...</p>
                     </div>
                   </div>
-                  <button onClick={() => handleStatusUpdate(delivery.id, 'EM ROTA')} className="btn-outline" style={{ borderColor: 'var(--primary)', color: 'var(--primary)', padding: '0.4rem 0.8rem', fontSize: '11px' }}>
+                  <button onClick={() => handleStatusUpdate(delivery.id, 'EM ROTA')} className="btn-outline" style={{ borderColor: 'var(--primary)', color: 'var(--primary)', padding: '0.8rem 1.5rem', fontSize: '14px', fontWeight: 800 }}>
                     Assumir
                   </button>
                 </div>
@@ -499,7 +633,19 @@ export default function DriverApp() {
           border-color: var(--accent) !important;
           box-shadow: 0 8px 30px rgba(57, 255, 20, 0.05);
         }
+        .drivers-grid {
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: 1.5rem;
+          width: 100%;
+        }
+        @media (min-width: 600px) {
+          .drivers-grid {
+            grid-template-columns: repeat(2, 1fr);
+          }
+        }
       `}</style>
     </div>
   );
 }
+
