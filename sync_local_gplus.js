@@ -40,7 +40,9 @@ async function syncAllOrdersFromToday() {
                 E.LOGRADOURO,
                 E.NUMERO AS NUMERO_CASA,
                 E.BAIRRO,
-                V.VALOR_FINAL
+                V.VALOR_FINAL,
+                COALESCE(V.CUPOM_CANCELADO, 'N') AS CANCELADO,
+                COALESCE(V.STATUS_VENDA, 'N') AS STATUS_VENDA
             FROM ECF_VENDA_CABECALHO V
             LEFT JOIN ECF_VENDA_COMANDA C ON (C.ID_VENDA_CABECALHO = V.ID)
             LEFT JOIN ENDERECO E ON (E.ID = V.ID_ENDERECO)
@@ -63,11 +65,20 @@ async function syncAllOrdersFromToday() {
             console.log(`[+] Encontrados ${result.length} pedidos. Sincronizando...`);
 
             for (const row of result) {
+                const totalAmount = parseFloat(row.VALOR_FINAL || 0);
+                const isCanceled = row.CANCELADO === 'S' || row.STATUS_VENDA === 'C';
+
+                if (totalAmount <= 0 && !isCanceled) {
+                    console.log(`[skip] Ignorando comanda #${String(row.NUMERO_COMANDA).trim()} pois está sem valor (R$ ${totalAmount}).`);
+                    continue;
+                }
+
                 const orderData = {
                     orderNumber: `#${String(row.NUMERO_COMANDA).trim()}`,
                     customerName: (row.NOME_CLIENTE || "Cliente GPlus").trim(),
                     address: `${(row.LOGRADOURO || 'S/E').trim()}, ${(String(row.NUMERO_CASA || '')).trim()} - ${(row.BAIRRO || '').trim()}`,
-                    totalAmount: parseFloat(row.VALOR_FINAL || 0),
+                    totalAmount: totalAmount,
+                    status: isCanceled ? 'CANCELADO' : 'PENDENTE',
                 };
 
                 try {

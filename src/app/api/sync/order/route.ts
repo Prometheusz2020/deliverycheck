@@ -14,6 +14,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Missing order data" }, { status: 400 });
     }
 
+    // Ignora comandas que estão sem valor (<= 0), pois são lançamentos incompletos/com erro
+    if (order.totalAmount !== undefined && order.totalAmount !== null && order.totalAmount <= 0) {
+      return NextResponse.json({ success: true, message: "Ignorado por estar sem valor" });
+    }
+
     // Busca pedido de hoje com o mesmo número para evitar duplicidade ou atualizar dados
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -26,14 +31,15 @@ export async function POST(req: Request) {
     });
 
     if (existing) {
-      // Se já existe e ainda está pendente, atualizamos os dados (caso tenha mudado algo no GPlus)
-      if (existing.status === "PENDENTE") {
+      // Se já existe e ainda está pendente ou está sendo cancelado, atualizamos os dados
+      if (existing.status === "PENDENTE" || order.status === "CANCELADO") {
         const updated = await prisma.delivery.update({
           where: { id: existing.id },
           data: {
             customerName: order.customerName,
             address: order.address,
             totalAmount: order.totalAmount,
+            status: order.status || existing.status,
           }
         });
         return NextResponse.json({ success: true, message: "Pedido atualizado", delivery: updated });
@@ -49,7 +55,7 @@ export async function POST(req: Request) {
         address: order.address || "Endereço não informado",
         totalAmount: order.totalAmount || 0,
         deliveryFee: 0,
-        status: "PENDENTE",
+        status: order.status || "PENDENTE",
         observations: "Importado do GPlus",
       },
     });
