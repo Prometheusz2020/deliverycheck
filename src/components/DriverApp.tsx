@@ -31,6 +31,7 @@ export default function DriverApp() {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [markedDeliveryIds, setMarkedDeliveryIds] = useState<string[]>([]);
   const [isCompleting, setIsCompleting] = useState(false);
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
 
   const fetchData = async () => {
     try {
@@ -91,6 +92,30 @@ export default function DriverApp() {
     return () => clearInterval(interval);
   }, [driver]);
 
+  // Auto Logout on Inactivity
+  useEffect(() => {
+    if (!driver) return;
+
+    let timeoutId: NodeJS.Timeout;
+
+    const resetTimeout = () => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        handleLogout();
+      }, 45000); // 45 seconds of inactivity
+    };
+
+    const events = ["mousedown", "mousemove", "keypress", "scroll", "touchstart"];
+    events.forEach(event => document.addEventListener(event, resetTimeout));
+
+    resetTimeout();
+
+    return () => {
+      clearTimeout(timeoutId);
+      events.forEach(event => document.removeEventListener(event, resetTimeout));
+    };
+  }, [driver]);
+
   const handlePinSubmit = async (pin: string) => {
     if (!selectedDriver) return;
     setIsLoggingIn(true);
@@ -102,6 +127,7 @@ export default function DriverApp() {
         setDriver(session);
         setSelectedDriver(null);
         setPinCode("");
+        setIsLoginModalOpen(false);
         fetchData();
       } else {
         alert("PIN incorreto!");
@@ -137,6 +163,7 @@ export default function DriverApp() {
     setDriver(null);
     setSelectedDriver(null);
     setPinCode("");
+    setIsLoginModalOpen(false);
     fetchDriversAndDeliveries();
   };
 
@@ -201,90 +228,39 @@ export default function DriverApp() {
             <Zap size={14} style={{ color: 'var(--accent)' }} />
             <span style={{ fontSize: '10px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.2em', color: 'var(--accent)' }}>ZTILABS LOGISTICS</span>
           </div>
-          <h1 style={{ fontSize: '3rem', fontWeight: 900, marginBottom: '0.5rem', letterSpacing: '-0.02em' }}>TELA DE ESPERA</h1>
-          <p style={{ fontSize: '16px', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.3em' }}>Selecione seu card para operar</p>
+          <h1 style={{ fontSize: '3rem', fontWeight: 900, marginBottom: '0.5rem', letterSpacing: '-0.02em' }}>PAINEL DE ESPERA</h1>
+          <p style={{ fontSize: '16px', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.3em' }}>Sistema de Entregas</p>
         </div>
 
-        {/* Drivers Grid */}
-        <div className="drivers-grid">
-          {driversList.length === 0 ? (
-            <div className="card-premium" style={{ textAlign: 'center', padding: '3rem', opacity: 0.5 }}>
-              <Package size={30} style={{ marginBottom: '1rem', opacity: 0.3 }} />
-              <p style={{ fontSize: '12px' }}>Nenhum motoboy cadastrado no sistema.</p>
+        {/* Info Card */}
+        <div className="card-premium animate-entrance hover-card" style={{ width: '100%', maxWidth: '500px', padding: '2.5rem', textAlign: 'center', marginBottom: '2rem', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+            <div style={{ background: 'rgba(255, 183, 0, 0.05)', border: '1px solid rgba(255, 183, 0, 0.1)', padding: '1.5rem', borderRadius: '16px' }}>
+              <p style={{ fontSize: '3.5rem', fontWeight: 900, color: 'var(--warning)', lineHeight: '1' }}>
+                {deliveries.filter(d => !d.driverId && d.status === 'PENDENTE').length}
+              </p>
+              <p style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase', marginTop: '0.5rem', letterSpacing: '0.1em' }}>Disponíveis</p>
             </div>
-          ) : (
-            driversList.map(dr => {
-              const driverDeliveries = deliveries.filter(d => d.driverId === dr.id);
-              const onRouteCount = driverDeliveries.filter(d => d.status === 'EM ROTA').length;
-              const deliveredCount = driverDeliveries.filter(d => d.status === 'ENTREGUE').length;
-              const todayFees = driverDeliveries
-                .filter(d => d.status === 'ENTREGUE')
-                .reduce((sum, d) => sum + (d.deliveryFee || 0), 0);
+            <div style={{ background: 'rgba(57, 255, 20, 0.05)', border: '1px solid rgba(57, 255, 20, 0.1)', padding: '1.5rem', borderRadius: '16px' }}>
+              <p style={{ fontSize: '3.5rem', fontWeight: 900, color: 'var(--accent)', lineHeight: '1' }}>
+                {deliveries.filter(d => d.status === 'EM ROTA').length}
+              </p>
+              <p style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase', marginTop: '0.5rem', letterSpacing: '0.1em' }}>Em Rota</p>
+            </div>
+          </div>
 
-              return (
-                <div 
-                  key={dr.id} 
-                  onClick={() => setSelectedDriver(dr)}
-                  className="card-premium animate-entrance hover-card" 
-                  style={{ 
-                    padding: '2rem', 
-                    cursor: 'pointer', 
-                    borderLeft: onRouteCount > 0 ? '6px solid var(--accent)' : '6px solid rgba(255,255,255,0.1)',
-                    transition: 'all 0.2s ease-in-out'
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.2rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                      <div style={{ 
-                        width: '55px', 
-                        height: '55px', 
-                        background: onRouteCount > 0 ? 'var(--accent)' : 'var(--surface-high)', 
-                        borderRadius: '12px', 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        justifyContent: 'center', 
-                        color: onRouteCount > 0 ? '#000' : 'var(--text-muted)' 
-                      }}>
-                        <User size={28} />
-                      </div>
-                      <div>
-                        <p style={{ fontWeight: 800, fontSize: '1.8rem', color: '#fff', lineHeight: 1.1 }}>{dr.name.toUpperCase()}</p>
-                        <span style={{ 
-                          fontSize: '12px', 
-                          fontWeight: 900, 
-                          padding: '0.3rem 0.7rem', 
-                          borderRadius: '6px',
-                          background: onRouteCount > 0 ? 'rgba(57, 255, 20, 0.1)' : 'rgba(255,255,255,0.05)',
-                          color: onRouteCount > 0 ? 'var(--accent)' : 'var(--text-muted)'
-                        }}>
-                          {onRouteCount > 0 ? 'EM ROTA' : 'AGUARDANDO'}
-                        </span>
-                      </div>
-                    </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <p style={{ fontSize: '20px', color: 'var(--accent)', fontWeight: 900 }}>R$ {todayFees.toFixed(2)}</p>
-                      <p style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>Taxas de Hoje</p>
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1.2rem' }}>
-                    <div style={{ textAlign: 'center', background: 'rgba(255,255,255,0.02)', padding: '0.8rem', borderRadius: '12px' }}>
-                      <p style={{ fontSize: '1.5rem', fontWeight: 900, color: 'var(--primary)' }}>{onRouteCount}</p>
-                      <p style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>Em Rota</p>
-                    </div>
-                    <div style={{ textAlign: 'center', background: 'rgba(255,255,255,0.02)', padding: '0.8rem', borderRadius: '12px' }}>
-                      <p style={{ fontSize: '1.5rem', fontWeight: 900, color: 'var(--success)' }}>{deliveredCount}</p>
-                      <p style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>Entregues</p>
-                    </div>
-                  </div>
-                </div>
-              );
-            })
-          )}
+          <button 
+            onClick={() => setIsLoginModalOpen(true)}
+            className="btn-main hover-card" 
+            style={{ width: '100%', height: '65px', fontSize: '1.3rem', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}
+          >
+            <User size={24} />
+            <span>ACESSAR MEU PAINEL</span>
+          </button>
         </div>
 
-        {/* PIN Keyboard Modal Overlay */}
-        {selectedDriver && (
+        {/* Login Modal Overlay */}
+        {isLoginModalOpen && (
           <div style={{
             position: 'fixed',
             top: 0,
@@ -300,105 +276,163 @@ export default function DriverApp() {
             zIndex: 999,
             padding: '1rem'
           }}>
-            <div className="card-premium animate-entrance" style={{ 
-              width: '100%', 
-              maxWidth: '380px', 
-              padding: '2.5rem 2rem', 
-              textAlign: 'center', 
-              background: 'rgba(10, 10, 26, 0.95)',
-              border: '1px solid rgba(255, 255, 255, 0.08)',
-              borderRadius: '24px',
-              boxShadow: '0 24px 64px rgba(0,0,0,0.85)'
-            }}>
-              <p style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.3em', marginBottom: '0.5rem' }}>AUTENTICAÇÃO MOTOBOY</p>
-              <h3 style={{ fontSize: '1.6rem', color: '#fff', fontWeight: 800, letterSpacing: '-0.02em', marginBottom: '0.3rem' }}>{selectedDriver.name.toUpperCase()}</h3>
-              <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '2rem' }}>Digite seu PIN de segurança para continuar</p>
-              
-              {/* PIN Dots display container */}
-              <div style={{ 
-                background: 'rgba(0, 0, 0, 0.35)', 
-                border: '1px solid rgba(255, 255, 255, 0.04)', 
-                borderRadius: '99px', 
-                padding: '0.8rem 2.2rem', 
-                display: 'inline-flex', 
-                gap: '16px', 
-                marginBottom: '2.5rem' 
+            {!selectedDriver ? (
+              /* Driver Selection View */
+              <div className="card-premium animate-entrance" style={{ 
+                width: '100%', 
+                maxWidth: '450px', 
+                padding: '2.5rem 2rem', 
+                background: 'rgba(10, 10, 26, 0.95)',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                borderRadius: '24px',
+                boxShadow: '0 24px 64px rgba(0,0,0,0.85)',
+                maxHeight: '90vh',
+                display: 'flex',
+                flexDirection: 'column'
               }}>
-                {[0, 1, 2, 3].map((idx) => (
-                  <div 
-                    key={idx} 
-                    style={{
-                      width: '16px',
-                      height: '16px',
-                      borderRadius: '50%',
-                      border: '2px solid rgba(255, 255, 255, 0.2)',
-                      borderColor: pinCode.length > idx ? 'var(--accent)' : 'rgba(255,255,255,0.2)',
-                      background: pinCode.length > idx ? 'var(--accent)' : 'transparent',
-                      boxShadow: pinCode.length > idx ? '0 0 10px var(--accent)' : 'none',
-                      transition: 'all 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
-                    }}
-                  />
-                ))}
-              </div>
-
-              {/* Keypad Grid */}
-              <div style={{ 
-                display: 'grid', 
-                gridTemplateColumns: 'repeat(3, 1fr)', 
-                gap: '20px', 
-                marginBottom: '2rem',
-                maxWidth: '340px',
-                margin: '0 auto 2rem auto',
-                justifyItems: 'center'
-              }}>
-                {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(num => (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+                  <h3 style={{ fontSize: '1.4rem', color: '#fff', fontWeight: 800 }}>SELECIONE SEU NOME</h3>
                   <button 
-                    key={num} 
-                    onClick={() => handleKeypadPress(String(num))}
+                    onClick={() => setIsLoginModalOpen(false)}
+                    className="btn-outline" 
+                    style={{ padding: '0.4rem 0.8rem', fontSize: '12px', borderColor: 'rgba(255,255,255,0.1)', color: 'var(--text-muted)' }}
+                  >
+                    Fechar
+                  </button>
+                </div>
+                
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', overflowY: 'auto', paddingRight: '4px' }}>
+                  {driversList.length === 0 ? (
+                    <p style={{ fontSize: '14px', color: 'var(--text-muted)', textAlign: 'center' }}>Nenhum motoboy cadastrado.</p>
+                  ) : (
+                    driversList.map(dr => (
+                      <button
+                        key={dr.id}
+                        onClick={() => setSelectedDriver(dr)}
+                        className="btn-outline hover-card"
+                        style={{
+                          width: '100%',
+                          padding: '1.2rem',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'flex-start',
+                          fontSize: '1.2rem',
+                          fontWeight: 800,
+                          color: '#fff',
+                          background: 'rgba(255,255,255,0.02)',
+                          borderColor: 'rgba(255,255,255,0.05)',
+                          textAlign: 'left'
+                        }}
+                      >
+                        <User size={18} style={{ marginRight: '10px', color: 'var(--accent)' }} />
+                        {dr.name.toUpperCase()}
+                      </button>
+                    ))
+                  )}
+                </div>
+              </div>
+            ) : (
+              /* PIN Code View */
+              <div className="card-premium animate-entrance" style={{ 
+                width: '100%', 
+                maxWidth: '380px', 
+                padding: '2.5rem 2rem', 
+                textAlign: 'center', 
+                background: 'rgba(10, 10, 26, 0.95)',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                borderRadius: '24px',
+                boxShadow: '0 24px 64px rgba(0,0,0,0.85)'
+              }}>
+                <p style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.3em', marginBottom: '0.5rem' }}>AUTENTICAÇÃO MOTOBOY</p>
+                <h3 style={{ fontSize: '1.6rem', color: '#fff', fontWeight: 800, letterSpacing: '-0.02em', marginBottom: '0.3rem' }}>{selectedDriver.name.toUpperCase()}</h3>
+                <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '2rem' }}>Digite seu PIN de segurança para continuar</p>
+                
+                {/* PIN Dots display container */}
+                <div style={{ 
+                  background: 'rgba(0, 0, 0, 0.35)', 
+                  border: '1px solid rgba(255, 255, 255, 0.04)', 
+                  borderRadius: '99px', 
+                  padding: '0.8rem 2.2rem', 
+                  display: 'inline-flex', 
+                  gap: '16px', 
+                  marginBottom: '2.5rem' 
+                }}>
+                  {[0, 1, 2, 3].map((idx) => (
+                    <div 
+                      key={idx} 
+                      style={{
+                        width: '16px',
+                        height: '16px',
+                        borderRadius: '50%',
+                        border: '2px solid rgba(255, 255, 255, 0.2)',
+                        borderColor: pinCode.length > idx ? 'var(--accent)' : 'rgba(255,255,255,0.2)',
+                        background: pinCode.length > idx ? 'var(--accent)' : 'transparent',
+                        boxShadow: pinCode.length > idx ? '0 0 10px var(--accent)' : 'none',
+                        transition: 'all 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
+                      }}
+                    />
+                  ))}
+                </div>
+
+                {/* Keypad Grid */}
+                <div style={{ 
+                  display: 'grid', 
+                  gridTemplateColumns: 'repeat(3, 1fr)', 
+                  gap: '20px', 
+                  marginBottom: '2rem',
+                  maxWidth: '340px',
+                  margin: '0 auto 2rem auto',
+                  justifyItems: 'center'
+                }}>
+                  {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(num => (
+                    <button 
+                      key={num} 
+                      onClick={() => handleKeypadPress(String(num))}
+                      className="pin-btn"
+                      type="button"
+                    >
+                      {num}
+                    </button>
+                  ))}
+                  
+                  {/* Back / Voltar Button */}
+                  <button 
+                    onClick={() => { setSelectedDriver(null); setPinCode(""); }}
+                    className="pin-btn pin-btn-special"
+                    type="button"
+                    title="Voltar"
+                  >
+                    <ArrowLeft size={22} />
+                  </button>
+                  
+                  {/* Zero Button */}
+                  <button 
+                    onClick={() => handleKeypadPress('0')}
                     className="pin-btn"
                     type="button"
                   >
-                    {num}
+                    0
                   </button>
-                ))}
-                
-                {/* Back / Voltar Button */}
-                <button 
-                  onClick={() => { setSelectedDriver(null); setPinCode(""); }}
-                  className="pin-btn pin-btn-special"
-                  type="button"
-                  title="Voltar"
-                >
-                  <ArrowLeft size={22} />
-                </button>
-                
-                {/* Zero Button */}
-                <button 
-                  onClick={() => handleKeypadPress('0')}
-                  className="pin-btn"
-                  type="button"
-                >
-                  0
-                </button>
-                
-                {/* Clear / Delete Button */}
-                <button 
-                  onClick={handleKeypadClear}
-                  className="pin-btn pin-btn-special pin-btn-danger"
-                  type="button"
-                  title="Limpar"
-                >
-                  <Delete size={22} />
-                </button>
-              </div>
-              
-              {isLoggingIn && (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', minHeight: '20px' }}>
-                  <Loader2 size={16} className="spin" style={{ color: 'var(--accent)' }} />
-                  <span style={{ fontSize: '11px', color: 'var(--accent)', fontWeight: 600 }}>Verificando PIN...</span>
+                  
+                  {/* Clear / Delete Button */}
+                  <button 
+                    onClick={handleKeypadClear}
+                    className="pin-btn pin-btn-special pin-btn-danger"
+                    type="button"
+                    title="Limpar"
+                  >
+                    <Delete size={22} />
+                  </button>
                 </div>
-              )}
-            </div>
+                
+                {isLoggingIn && (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', minHeight: '20px' }}>
+                    <Loader2 size={16} className="spin" style={{ color: 'var(--accent)' }} />
+                    <span style={{ fontSize: '11px', color: 'var(--accent)', fontWeight: 600 }}>Verificando PIN...</span>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>
