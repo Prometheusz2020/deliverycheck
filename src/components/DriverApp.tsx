@@ -36,7 +36,7 @@ export default function DriverApp() {
   const fetchData = async () => {
     try {
       const actions = await import("@/lib/actions");
-      const today = new Date().toISOString().split('T')[0];
+      const today = new Date().toLocaleDateString('sv-SE');
       const data = await actions.getDeliveries(today);
       const filtered = (data as Delivery[]).filter(d => hasValidAddress(d.address));
       setDeliveries(filtered);
@@ -48,7 +48,7 @@ export default function DriverApp() {
   const fetchDriversAndDeliveries = async () => {
     try {
       const actions = await import("@/lib/actions");
-      const today = new Date().toISOString().split('T')[0];
+      const today = new Date().toLocaleDateString('sv-SE');
       const [driversData, deliveriesData] = await Promise.all([
         actions.getDrivers(),
         actions.getDeliveries(today)

@@ -20,7 +20,7 @@ export default function RestaurantPortal() {
   const [newDriverName, setNewDriverName] = useState("");
   const [newDriverPass, setNewDriverPass] = useState("");
   const [isAddingDriver, setIsAddingDriver] = useState(false);
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedDate, setSelectedDate] = useState(new Date().toLocaleDateString('sv-SE'));
 
   // Estados para Filtro e Seleção
   const [onlyWithAddress, setOnlyWithAddress] = useState(true);
