@@ -23,6 +23,25 @@ const VERCEL_URL = process.env.VERCEL_URL || 'https://delivery-check-six.vercel.
 const SYNC_TOKEN = process.env.SYNC_TOKEN || 'ztilabs_sync_secret_2024';
 const POLLING_INTERVAL = parseInt(process.env.POLLING_INTERVAL || '30000'); // 30 segundos
 
+function hasValidAddress(logradouro) {
+    if (!logradouro) return false;
+    const clean = String(logradouro).trim().toLowerCase();
+    
+    // Lista de termos comuns para indicar ausência de endereço ou consumo local/retirada
+    const invalidKeywords = [
+        "", "0", "s/e", "se", "s/n", "sn", "n/a", "na", "null", "undefined", "*", ".", "---",
+        "nao informado", "não informado", "nao informada", "não informada",
+        "balcao", "balcão", "mesa", "retirada", "consumo local", "estabelecimento"
+    ];
+    
+    if (invalidKeywords.includes(clean)) return false;
+    
+    // Padrões de placeholder
+    if (clean === "s/e, -" || clean.startsWith("s/e,") || clean.replace(/[^a-z0-9]/g, "") === "se") return false;
+    
+    return true;
+}
+
 async function syncAllOrdersFromToday() {
     console.log(`[${new Date().toLocaleTimeString()}] Iniciando verificação de novos pedidos...`);
     
@@ -65,7 +84,15 @@ async function syncAllOrdersFromToday() {
             console.log(`[+] Encontrados ${result.length} pedidos. Sincronizando...`);
 
             for (const row of result) {
-                const totalAmount = parseFloat(row.VALOR_FINAL || 0);
+                let totalAmount = 0;
+                if (row.VALOR_FINAL !== null && row.VALOR_FINAL !== undefined) {
+                    const valStr = String(row.VALOR_FINAL).replace(',', '.').trim();
+                    totalAmount = parseFloat(valStr);
+                }
+                if (isNaN(totalAmount)) {
+                    totalAmount = 0;
+                }
+
                 const isCanceled = row.CANCELADO === 'S' || row.STATUS_VENDA === 'C';
 
                 if (totalAmount <= 0 && !isCanceled) {
@@ -73,19 +100,37 @@ async function syncAllOrdersFromToday() {
                     continue;
                 }
 
+                const logradouro = row.LOGRADOURO;
+                if (!hasValidAddress(logradouro) && !isCanceled) {
+                    console.log(`[skip] Ignorando comanda #${String(row.NUMERO_COMANDA).trim()} pois não possui endereço válido de entrega.`);
+                    continue;
+                }
+
+                const addressParts = [];
+                if (row.LOGRADOURO) addressParts.push(String(row.LOGRADOURO).trim());
+                if (row.NUMERO_CASA) addressParts.push(String(row.NUMERO_CASA).trim());
+                if (row.BAIRRO) addressParts.push(String(row.BAIRRO).trim());
+
+                const finalAddress = addressParts.length > 0 ? addressParts.join(', ') : 'Endereço não informado';
+
                 const orderData = {
                     orderNumber: `#${String(row.NUMERO_COMANDA).trim()}`,
                     customerName: (row.NOME_CLIENTE || "Cliente GPlus").trim(),
-                    address: `${(row.LOGRADOURO || 'S/E').trim()}, ${(String(row.NUMERO_CASA || '')).trim()} - ${(row.BAIRRO || '').trim()}`,
+                    address: finalAddress,
                     totalAmount: totalAmount,
                     status: isCanceled ? 'CANCELADO' : 'PENDENTE',
                 };
 
                 try {
-                    await axios.post(`${VERCEL_URL}/api/sync/order`, {
+                    const response = await axios.post(`${VERCEL_URL}/api/sync/order`, {
                         syncToken: SYNC_TOKEN,
                         order: orderData
                     });
+                    if (response.data && response.data.message) {
+                        console.log(`[+] Comanda #${String(row.NUMERO_COMANDA).trim()}: ${response.data.message}`);
+                    } else {
+                        console.log(`[+] Comanda #${String(row.NUMERO_COMANDA).trim()} sincronizada.`);
+                    }
                 } catch (apiErr) {
                     console.error(`[-] Falha ao enviar pedido #${row.NUMERO_COMANDA}:`, apiErr.message);
                 }

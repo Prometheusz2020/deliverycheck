@@ -595,7 +595,6 @@ export default function RestaurantPortal() {
               {drivers.map(dr => {
                 const onRoute = deliveries.filter(d => d.driverId === dr.id && d.status === 'EM ROTA');
                 const delivered = deliveries.filter(d => d.driverId === dr.id && d.status === 'ENTREGUE');
-                const allDeliveries = deliveries.filter(d => d.driverId === dr.id);
 
                 return (
                   <div key={dr.id} className="card-premium" style={{ padding: '1.5rem' }}>
@@ -646,38 +645,67 @@ export default function RestaurantPortal() {
                           <p style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Entregues</p>
                         </div>
                       </div>
-                    </div>
-
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-                      <p style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: 900, textTransform: 'uppercase', marginBottom: '4px' }}>Histórico Recente</p>
-                      {allDeliveries.length === 0 ? (
-                        <p style={{ fontSize: '11px', color: 'var(--text-muted)', opacity: 0.5 }}>Nenhum registro encontrado.</p>
-                      ) : (
-                        allDeliveries.slice(0, 5).map(delivery => (
-                          <div key={delivery.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.02)', padding: '0.6rem 1rem', borderRadius: '10px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                              <span style={{ fontSize: '11px', fontWeight: 800, color: delivery.status === 'ENTREGUE' ? 'var(--success)' : 'var(--primary)' }}>{delivery.orderNumber}</span>
-                              <span style={{ fontSize: '12px', fontWeight: 600 }}>{delivery.customerName}</span>
-                            </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                               <span style={{ 
-                                 fontSize: '9px', 
-                                 fontWeight: 900, 
-                                 padding: '0.2rem 0.6rem', 
-                                 borderRadius: '4px',
-                                 background: delivery.status === 'ENTREGUE' ? 'rgba(52, 199, 89, 0.1)' : 'rgba(0, 122, 255, 0.1)',
-                                 color: delivery.status === 'ENTREGUE' ? 'var(--success)' : 'var(--primary)'
-                               }}>{delivery.status}</span>
-                               <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
-                                 {delivery.status === 'ENTREGUE' 
-                                   ? new Date(delivery.deliveredAt!).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
-                                   : new Date(delivery.scannedAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                               </span>
-                            </div>
+                               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+                      {/* Entregas Ativas / Em Rota */}
+                      <div>
+                        <p style={{ fontSize: '10px', color: 'var(--primary)', fontWeight: 900, textTransform: 'uppercase', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span className="pulse-dot" style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--primary)', display: 'inline-block' }}></span>
+                          Em Rota ({onRoute.length})
+                        </p>
+                        {onRoute.length === 0 ? (
+                          <p style={{ fontSize: '11px', color: 'var(--text-muted)', opacity: 0.5, paddingLeft: '8px' }}>Nenhuma entrega em rota.</p>
+                        ) : (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                            {onRoute.map(delivery => (
+                              <div key={delivery.id} style={{ display: 'flex', flexDirection: 'column', background: 'rgba(0, 122, 255, 0.05)', border: '1px solid rgba(0, 122, 255, 0.15)', padding: '0.8rem 1rem', borderRadius: '10px', gap: '4px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                  <span style={{ fontSize: '12px', fontWeight: 800, color: 'var(--primary)' }}>{delivery.orderNumber}</span>
+                                  <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--success)' }}>R$ {delivery.totalAmount?.toFixed(2)}</span>
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                  <p style={{ fontSize: '12px', fontWeight: 600, color: '#fff' }}>{delivery.customerName}</p>
+                                  <p style={{ fontSize: '10px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
+                                    <MapPin size={10} style={{ flexShrink: 0 }} /> {delivery.address}
+                                  </p>
+                                </div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px', borderTop: '1px solid rgba(255,255,255,0.03)', paddingTop: '4px' }}>
+                                  <span style={{ fontSize: '9px', color: 'var(--text-muted)' }}>Saída: {new Date(delivery.scannedAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                                  {delivery.observations && (
+                                    <span style={{ fontSize: '9px', color: 'var(--warning)', background: 'rgba(255,149,0,0.1)', padding: '1px 6px', borderRadius: '4px' }}>Obs: {delivery.observations}</span>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
                           </div>
-                        ))
-                      )}
-                    </div>
+                        )}
+                      </div>
+
+                      {/* Histórico Recente (Entregues) */}
+                      <div style={{ marginTop: '0.4rem' }}>
+                        <p style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: 900, textTransform: 'uppercase', marginBottom: '6px' }}>Histórico Recente (Entregues)</p>
+                        {delivered.length === 0 ? (
+                          <p style={{ fontSize: '11px', color: 'var(--text-muted)', opacity: 0.5, paddingLeft: '8px' }}>Nenhum histórico recente hoje.</p>
+                        ) : (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                            {[...delivered].sort((a, b) => new Date(b.deliveredAt || b.scannedAt).getTime() - new Date(a.deliveredAt || a.scannedAt).getTime()).slice(0, 3).map(delivery => (
+                              <div key={delivery.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.02)', padding: '0.6rem 1rem', borderRadius: '10px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                  <span style={{ fontSize: '11px', fontWeight: 800, color: 'var(--success)' }}>{delivery.orderNumber}</span>
+                                  <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)' }}>{delivery.customerName}</span>
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                   <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
+                                     {delivery.deliveredAt 
+                                       ? new Date(delivery.deliveredAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+                                       : '--:--'}
+                                   </span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>              </div>
                   </div>
                 );
               })}

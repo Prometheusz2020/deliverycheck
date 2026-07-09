@@ -19,6 +19,24 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: true, message: "Ignorado por estar sem valor" });
     }
 
+    // Função auxiliar para verificar se o endereço é de entrega válido (não balcão, mesa, etc.)
+    const hasValidAddress = (addr?: string) => {
+      if (!addr) return false;
+      const clean = addr.trim().toLowerCase();
+      const invalidKeywords = [
+        "", "0", "s/e", "se", "s/n", "sn", "n/a", "na", "null", "undefined", "*", ".", "---",
+        "nao informado", "não informado", "nao informada", "não informada",
+        "balcao", "balcão", "mesa", "retirada", "consumo local", "estabelecimento"
+      ];
+      if (invalidKeywords.includes(clean)) return false;
+      if (clean === "s/e, -" || clean.startsWith("s/e,") || clean.replace(/[^a-z0-9]/g, "") === "se") return false;
+      return true;
+    };
+
+    if (!hasValidAddress(order.address) && order.status !== "CANCELADO") {
+      return NextResponse.json({ success: true, message: "Ignorado por ser consumo local/balcão (sem endereço)" });
+    }
+
     // Busca pedido de hoje com o mesmo número para evitar duplicidade ou atualizar dados
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -31,8 +49,8 @@ export async function POST(req: Request) {
     });
 
     if (existing) {
-      // Se já existe e ainda está pendente ou está sendo cancelado, atualizamos os dados
-      if (existing.status === "PENDENTE" || order.status === "CANCELADO") {
+      // Se já existe e não está finalizado (ENTREGUE), ou está sendo cancelado, atualizamos os dados
+      if (existing.status !== "ENTREGUE" || order.status === "CANCELADO") {
         const updated = await prisma.delivery.update({
           where: { id: existing.id },
           data: {
@@ -44,7 +62,7 @@ export async function POST(req: Request) {
         });
         return NextResponse.json({ success: true, message: "Pedido atualizado", delivery: updated });
       }
-      return NextResponse.json({ success: true, message: "Pedido já está em rota ou entregue" });
+      return NextResponse.json({ success: true, message: "Pedido já finalizado/entregue" });
     }
 
     // Criar novo registro de entrega
