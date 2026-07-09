@@ -88,10 +88,20 @@ export async function updateDeliveryStatus(id: string, status: DeliveryStatus, d
   const oldStatus = delivery.status;
   
   await prisma.$transaction(async (tx) => {
+    let driverName = undefined;
+    if (driverId) {
+      const dr = await tx.driver.findUnique({ where: { id: driverId } });
+      if (dr) {
+        driverName = dr.name;
+      }
+    }
+
     await tx.delivery.update({
       where: { id },
       data: {
         status,
+        driverId: driverId || undefined,
+        deliveryPerson: driverName || undefined,
         deliveredAt: status === "ENTREGUE" ? new Date() : undefined
       }
     });

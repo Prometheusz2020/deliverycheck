@@ -195,7 +195,7 @@ export default function DriverApp() {
 
   const handleStatusUpdate = async (id: string, status: DeliveryStatus) => {
     const actions = await import("@/lib/actions");
-    await actions.updateDeliveryStatus(id, status);
+    await actions.updateDeliveryStatus(id, status, driver?.id);
     fetchData();
   };
 
@@ -499,31 +499,38 @@ export default function DriverApp() {
                     onClick={handleToggleMark}
                     className="card-premium animate-entrance" 
                     style={{ 
-                      padding: '1rem 1.5rem',
+                      padding: '0.8rem 1rem',
                       display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      borderLeft: isMarked ? '6px solid var(--success)' : '6px solid var(--accent)',
-                      background: isMarked ? 'rgba(52, 199, 89, 0.08)' : 'rgba(255,255,255,0.02)',
-                      borderColor: isMarked ? 'rgba(52, 199, 89, 0.4)' : undefined,
+                      flexDirection: 'column',
+                      gap: '4px',
+                      borderLeft: isMarked ? '4px solid var(--success)' : '4px solid var(--accent)',
+                      background: isMarked ? 'rgba(52, 199, 89, 0.06)' : 'rgba(255,255,255,0.02)',
+                      borderColor: isMarked ? 'rgba(52, 199, 89, 0.25)' : undefined,
                       cursor: 'pointer',
-                      transition: 'all 0.2s ease-in-out',
-                      boxShadow: isMarked ? '0 8px 30px rgba(52, 199, 89, 0.08)' : undefined
+                      transition: 'all 0.15s ease-in-out',
+                      boxShadow: isMarked ? '0 4px 15px rgba(52, 199, 89, 0.05)' : undefined
                     }}
                   >
-                    <span style={{ 
-                      fontSize: '1.4rem', 
-                      fontWeight: 900, 
-                      color: isMarked ? 'var(--success)' : 'var(--accent)'
-                    }}>
-                      Delivery {delivery.orderNumber}
-                    </span>
-                    <input 
-                      type="checkbox"
-                      checked={isMarked}
-                      readOnly
-                      style={{ width: '22px', height: '22px', cursor: 'pointer', accentColor: 'var(--success)' }}
-                    />
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '1.1rem', fontWeight: 900, color: isMarked ? 'var(--success)' : 'var(--accent)' }}>
+                        Delivery {delivery.orderNumber}
+                      </span>
+                      <input 
+                        type="checkbox"
+                        checked={isMarked}
+                        readOnly
+                        style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: 'var(--success)' }}
+                      />
+                    </div>
+                    
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: '2px' }}>
+                      <span style={{ fontSize: '12px', fontWeight: 700, color: '#fff' }}>{delivery.customerName}</span>
+                      <span style={{ fontSize: '11px', fontWeight: 800, color: 'var(--primary)' }}>R$ {delivery.totalAmount?.toFixed(2)}</span>
+                    </div>
+
+                    <p style={{ fontSize: '10px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '3px', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={delivery.address || ''}>
+                      <MapPin size={10} style={{ flexShrink: 0 }} /> {delivery.address}
+                    </p>
                   </div>
                 );
               })
