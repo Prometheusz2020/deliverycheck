@@ -22,6 +22,7 @@ export interface Delivery {
   deliveredAt?: Date | string;
   paymentMethod?: string;
   observations?: string;
+  itemsCount?: number;
 }
 
 export type DeliverySummary = {

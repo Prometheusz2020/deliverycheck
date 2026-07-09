@@ -57,7 +57,8 @@ export async function POST(req: Request) {
             customerName: order.customerName,
             address: order.address,
             totalAmount: order.totalAmount,
-            status: order.status || existing.status,
+            status: order.status === "CANCELADO" ? "CANCELADO" : existing.status,
+            itemsCount: order.itemsCount !== undefined ? Number(order.itemsCount) : existing.itemsCount,
           }
         });
         return NextResponse.json({ success: true, message: "Pedido atualizado", delivery: updated });
@@ -75,6 +76,7 @@ export async function POST(req: Request) {
         deliveryFee: 0,
         status: order.status || "PENDENTE",
         observations: "Importado do GPlus",
+        itemsCount: order.itemsCount !== undefined ? Number(order.itemsCount) : 1,
       },
     });
 

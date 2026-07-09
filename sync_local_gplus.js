@@ -61,7 +61,8 @@ async function syncAllOrdersFromToday() {
                 E.BAIRRO,
                 V.VALOR_FINAL,
                 COALESCE(V.CUPOM_CANCELADO, 'N') AS CANCELADO,
-                COALESCE(V.STATUS_VENDA, 'N') AS STATUS_VENDA
+                COALESCE(V.STATUS_VENDA, 'N') AS STATUS_VENDA,
+                COALESCE(V.TOT_QTD, 1) AS QUANTIDADE_ITENS
             FROM ECF_VENDA_CABECALHO V
             LEFT JOIN ECF_VENDA_COMANDA C ON (C.ID_VENDA_CABECALHO = V.ID)
             LEFT JOIN ENDERECO E ON (E.ID = V.ID_ENDERECO)
@@ -113,12 +114,18 @@ async function syncAllOrdersFromToday() {
 
                 const finalAddress = addressParts.length > 0 ? addressParts.join(', ') : 'Endereço não informado';
 
+                let itemsCount = Math.round(parseFloat(row.QUANTIDADE_ITENS || 1));
+                if (isNaN(itemsCount) || itemsCount <= 0) {
+                    itemsCount = 1;
+                }
+
                 const orderData = {
                     orderNumber: `#${String(row.NUMERO_COMANDA).trim()}`,
                     customerName: (row.NOME_CLIENTE || "Cliente GPlus").trim(),
                     address: finalAddress,
                     totalAmount: totalAmount,
                     status: isCanceled ? 'CANCELADO' : 'PENDENTE',
+                    itemsCount: itemsCount
                 };
 
                 try {

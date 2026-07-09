@@ -32,6 +32,7 @@ model Delivery {
   deliveredAt    DateTime?
   paymentMethod  String?
   observations   String?
+  itemsCount     Int       @default(1)
   updatedAt      DateTime  @updatedAt
 }
 

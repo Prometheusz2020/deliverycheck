@@ -220,6 +220,18 @@ export default function DriverApp() {
   };
 
   if (!driver) {
+    // Agrupar entregas em rota por motoboy
+    const activeDeliveries = deliveries.filter(d => d.status === 'EM ROTA');
+    const driverStats = activeDeliveries.reduce((acc, d) => {
+      const name = d.deliveryPerson || "Sem Nome";
+      if (!acc[name]) {
+        acc[name] = { count: 0, items: 0 };
+      }
+      acc[name].count += 1;
+      acc[name].items += d.itemsCount || 1;
+      return acc;
+    }, {} as Record<string, { count: number; items: number }>);
+
     return (
       <div className="animate-entrance" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '85vh', padding: '1.5rem', width: '100%', maxWidth: '800px', margin: '0 auto' }}>
         {/* Waiting Room Header */}
@@ -243,7 +255,7 @@ export default function DriverApp() {
             </div>
             <div style={{ background: 'rgba(57, 255, 20, 0.05)', border: '1px solid rgba(57, 255, 20, 0.1)', padding: '1.5rem', borderRadius: '16px' }}>
               <p style={{ fontSize: '3.5rem', fontWeight: 900, color: 'var(--accent)', lineHeight: '1' }}>
-                {deliveries.filter(d => d.status === 'EM ROTA').length}
+                {activeDeliveries.length}
               </p>
               <p style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase', marginTop: '0.5rem', letterSpacing: '0.1em' }}>Em Rota</p>
             </div>
@@ -259,8 +271,29 @@ export default function DriverApp() {
           </button>
         </div>
 
+        {/* Resumo de Marmitex por Motoboy */}
+        {Object.keys(driverStats).length > 0 && (
+          <div className="animate-entrance" style={{ width: '100%', maxWidth: '500px', marginBottom: '1.5rem' }}>
+            <h3 style={{ fontSize: '10px', color: 'var(--accent)', fontWeight: 900, textTransform: 'uppercase', marginBottom: '1rem', letterSpacing: '0.2em', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span className="pulse-dot" style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--accent)', display: 'inline-block' }}></span>
+              Marmitex por Motoboy
+            </h3>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '1rem' }}>
+              {Object.entries(driverStats).map(([name, stats]) => (
+                <div key={name} className="card-premium animate-entrance" style={{ padding: '1rem', textAlign: 'center', borderTop: '3px solid var(--accent)', background: 'rgba(57, 255, 20, 0.02)' }}>
+                  <p style={{ fontSize: '1.1rem', fontWeight: 900, color: '#fff', textTransform: 'uppercase', marginBottom: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</p>
+                  <p style={{ fontSize: '2rem', fontWeight: 900, color: 'var(--accent)', margin: '4px 0', lineHeight: 1 }}>{stats.items}</p>
+                  <p style={{ fontSize: '9px', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    {stats.items === 1 ? 'Marmitex' : 'Marmitex'} • {stats.count} {stats.count === 1 ? 'Envio' : 'Envios'}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* List of Active Deliveries on the Waiting Screen */}
-        {deliveries.filter(d => d.status === 'EM ROTA').length > 0 && (
+        {activeDeliveries.length > 0 && (
           <div className="animate-entrance" style={{ width: '100%', maxWidth: '500px', marginBottom: '2rem' }}>
             <h3 style={{ fontSize: '10px', color: 'var(--accent)', fontWeight: 900, textTransform: 'uppercase', marginBottom: '1rem', letterSpacing: '0.2em', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span className="pulse-dot" style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--accent)', display: 'inline-block' }}></span>
