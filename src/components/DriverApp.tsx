@@ -233,7 +233,7 @@ export default function DriverApp() {
         </div>
 
         {/* Info Card */}
-        <div className="card-premium animate-entrance hover-card" style={{ width: '100%', maxWidth: '500px', padding: '2.5rem', textAlign: 'center', marginBottom: '2rem', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+        <div className="card-premium animate-entrance hover-card" style={{ width: '100%', maxWidth: '500px', padding: '2.5rem', textAlign: 'center', marginBottom: '1.5rem', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
             <div style={{ background: 'rgba(255, 183, 0, 0.05)', border: '1px solid rgba(255, 183, 0, 0.1)', padding: '1.5rem', borderRadius: '16px' }}>
               <p style={{ fontSize: '3.5rem', fontWeight: 900, color: 'var(--warning)', lineHeight: '1' }}>
@@ -258,6 +258,54 @@ export default function DriverApp() {
             <span>ACESSAR MEU PAINEL</span>
           </button>
         </div>
+
+        {/* List of Active Deliveries on the Waiting Screen */}
+        {deliveries.filter(d => d.status === 'EM ROTA').length > 0 && (
+          <div className="animate-entrance" style={{ width: '100%', maxWidth: '500px', marginBottom: '2rem' }}>
+            <h3 style={{ fontSize: '10px', color: 'var(--accent)', fontWeight: 900, textTransform: 'uppercase', marginBottom: '1rem', letterSpacing: '0.2em', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span className="pulse-dot" style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--accent)', display: 'inline-block' }}></span>
+              Entregas em Rota Atuais
+            </h3>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+              {deliveries.filter(d => d.status === 'EM ROTA').map(delivery => {
+                const elapsedMins = Math.floor((new Date().getTime() - new Date(delivery.scannedAt).getTime()) / 60000);
+                const timeStr = elapsedMins < 1 ? 'agora' : `há ${elapsedMins} min`;
+                
+                return (
+                  <div key={delivery.id} className="card-premium" style={{ padding: '0.8rem 1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.02)', borderLeft: '4px solid var(--accent)' }}>
+                    <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                      <div style={{ background: 'rgba(57, 255, 20, 0.05)', padding: '0.3rem 0.6rem', borderRadius: '6px', border: '1px solid rgba(57, 255, 20, 0.1)' }}>
+                        <span style={{ fontSize: '11px', fontWeight: 900, color: 'var(--accent)' }}>{delivery.orderNumber}</span>
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span style={{ fontWeight: 800, fontSize: '12px', color: '#fff' }}>{delivery.customerName}</span>
+                          <span style={{ fontSize: '9px', color: 'var(--text-muted)' }}>({timeStr})</span>
+                        </div>
+                        <p style={{ fontSize: '10px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '3px', margin: '2px 0 0 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '200px' }}>
+                          <MapPin size={9} /> {delivery.address}
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(255,255,255,0.04)', padding: '0.1rem 0.4rem', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                        <User size={10} style={{ color: 'var(--accent)' }} />
+                        <span style={{ fontSize: '9px', fontWeight: 800, color: '#fff', textTransform: 'uppercase' }}>
+                          {delivery.deliveryPerson || 'Livre'}
+                        </span>
+                      </div>
+                      <span style={{ fontSize: '10px', fontWeight: 700, color: 'var(--success)' }}>
+                        R$ {delivery.totalAmount?.toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Login Modal Overlay */}
         {isLoginModalOpen && (
