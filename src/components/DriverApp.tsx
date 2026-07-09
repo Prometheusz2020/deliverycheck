@@ -24,6 +24,7 @@ export default function DriverApp() {
   const [driver, setDriver] = useState<{ id: string; name: string } | null>(null);
   const [driversList, setDriversList] = useState<Driver[]>([]);
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
+  const [selectedDriverFilter, setSelectedDriverFilter] = useState<string | null>(null);
   
   // PIN Login State
   const [selectedDriver, setSelectedDriver] = useState<Driver | null>(null);
@@ -232,6 +233,10 @@ export default function DriverApp() {
       return acc;
     }, {} as Record<string, { count: number; items: number }>);
 
+    const filteredActiveDeliveries = selectedDriverFilter
+      ? activeDeliveries.filter(d => d.deliveryPerson === selectedDriverFilter)
+      : activeDeliveries;
+
     return (
       <div className="animate-entrance" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '85vh', padding: '1.5rem', width: '100%', maxWidth: '800px', margin: '0 auto' }}>
         {/* Waiting Room Header */}
@@ -276,18 +281,36 @@ export default function DriverApp() {
           <div className="animate-entrance" style={{ width: '100%', maxWidth: '500px', marginBottom: '1.5rem' }}>
             <h3 style={{ fontSize: '10px', color: 'var(--accent)', fontWeight: 900, textTransform: 'uppercase', marginBottom: '1rem', letterSpacing: '0.2em', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span className="pulse-dot" style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--accent)', display: 'inline-block' }}></span>
-              Marmitex por Motoboy
+              Marmitex por Motoboy (Clique para filtrar)
             </h3>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '1rem' }}>
-              {Object.entries(driverStats).map(([name, stats]) => (
-                <div key={name} className="card-premium animate-entrance" style={{ padding: '1rem', textAlign: 'center', borderTop: '3px solid var(--accent)', background: 'rgba(57, 255, 20, 0.02)' }}>
-                  <p style={{ fontSize: '1.1rem', fontWeight: 900, color: '#fff', textTransform: 'uppercase', marginBottom: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</p>
-                  <p style={{ fontSize: '2rem', fontWeight: 900, color: 'var(--accent)', margin: '4px 0', lineHeight: 1 }}>{stats.items}</p>
-                  <p style={{ fontSize: '9px', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    {stats.items === 1 ? 'Marmitex' : 'Marmitex'} • {stats.count} {stats.count === 1 ? 'Envio' : 'Envios'}
-                  </p>
-                </div>
-              ))}
+              {Object.entries(driverStats).map(([name, stats]) => {
+                const isSelected = selectedDriverFilter === name;
+                return (
+                  <div 
+                    key={name} 
+                    onClick={() => setSelectedDriverFilter(isSelected ? null : name)}
+                    className="card-premium animate-entrance hover-card" 
+                    style={{ 
+                      padding: '1rem', 
+                      textAlign: 'center', 
+                      borderTop: isSelected ? '4px solid var(--accent)' : '3px solid rgba(255,255,255,0.05)', 
+                      background: isSelected ? 'rgba(57, 255, 20, 0.08)' : 'rgba(57, 255, 20, 0.02)',
+                      borderColor: isSelected ? 'var(--accent)' : undefined,
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease-in-out',
+                      transform: isSelected ? 'scale(1.03)' : undefined,
+                      boxShadow: isSelected ? '0 8px 24px rgba(57, 255, 20, 0.12)' : undefined
+                    }}
+                  >
+                    <p style={{ fontSize: '1.1rem', fontWeight: 900, color: isSelected ? 'var(--accent)' : '#fff', textTransform: 'uppercase', marginBottom: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</p>
+                    <p style={{ fontSize: '2rem', fontWeight: 900, color: 'var(--accent)', margin: '4px 0', lineHeight: 1 }}>{stats.items}</p>
+                    <p style={{ fontSize: '9px', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                      Marmitex • {stats.count} {stats.count === 1 ? 'Envio' : 'Envios'}
+                    </p>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
@@ -295,13 +318,24 @@ export default function DriverApp() {
         {/* List of Active Deliveries on the Waiting Screen */}
         {activeDeliveries.length > 0 && (
           <div className="animate-entrance" style={{ width: '100%', maxWidth: '500px', marginBottom: '2rem' }}>
-            <h3 style={{ fontSize: '10px', color: 'var(--accent)', fontWeight: 900, textTransform: 'uppercase', marginBottom: '1rem', letterSpacing: '0.2em', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span className="pulse-dot" style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--accent)', display: 'inline-block' }}></span>
-              Entregas em Rota Atuais
-            </h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h3 style={{ fontSize: '10px', color: 'var(--accent)', fontWeight: 900, textTransform: 'uppercase', margin: 0, letterSpacing: '0.2em', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span className="pulse-dot" style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--accent)', display: 'inline-block' }}></span>
+                Entregas em Rota Atuais {selectedDriverFilter && `- Filtrando por ${selectedDriverFilter}`}
+              </h3>
+              {selectedDriverFilter && (
+                <button 
+                  onClick={() => setSelectedDriverFilter(null)}
+                  className="btn-outline" 
+                  style={{ padding: '0.2rem 0.6rem', fontSize: '9px', borderColor: 'rgba(255,255,255,0.15)', color: 'var(--text-muted)', cursor: 'pointer', borderRadius: '4px', height: 'auto' }}
+                >
+                  Limpar Filtro
+                </button>
+              )}
+            </div>
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
-              {deliveries.filter(d => d.status === 'EM ROTA').map(delivery => {
+              {filteredActiveDeliveries.map(delivery => {
                 const elapsedMins = Math.floor((new Date().getTime() - new Date(delivery.scannedAt).getTime()) / 60000);
                 const timeStr = elapsedMins < 1 ? 'agora' : `há ${elapsedMins} min`;
                 
