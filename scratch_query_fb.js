@@ -16,36 +16,47 @@ Firebird.attach(fbOptions, (err, db) => {
     }
     console.log('[+] Connected to Firebird database!');
 
-    // Query tables containing RECEB, PAG, FORM, TIPO, MEIO
+    // Let's list tables containing TIPO_PAGAMENTO or similar
     const sql = `
-        SELECT rdb$relation_name AS TABLE_NAME
-        FROM rdb$relations
-        WHERE rdb$view_context IS NULL
-        AND (rdb$relation_name LIKE '%RECEB%'
-             OR rdb$relation_name LIKE '%PAG%'
-             OR rdb$relation_name LIKE '%FORM%'
-             OR rdb$relation_name LIKE '%TIPO%'
-             OR rdb$relation_name LIKE '%MEIO%')
-        ORDER BY TABLE_NAME
+        SELECT ID, DESCRICAO FROM ECF_TIPO_PAGAMENTO
     `;
 
     db.query(sql, (err, result) => {
         if (err) {
-            console.error('[-] Error querying tables:', err.message);
-            db.detach();
+            console.error('[-] Error querying ECF_TIPO_PAGAMENTO:', err.message);
+            // Let's list all columns of ECF_TIPO_PAGAMENTO if it failed because of column names
+            db.query(`
+                SELECT r.rdb$field_name AS field_name
+                FROM rdb$relation_fields r
+                WHERE r.rdb$relation_name = 'ECF_TIPO_PAGAMENTO'
+            `, (err2, result2) => {
+                if (!err2) {
+                    console.log('Columns in ECF_TIPO_PAGAMENTO:', result2.map(x => x.FIELD_NAME.trim()));
+                }
+                db.detach();
+            });
             return;
         }
 
-        console.log('[+] Found tables matching search:');
+        console.log('[+] Payment methods (ECF_TIPO_PAGAMENTO):');
         result.forEach(row => {
-            console.log(' -', row.TABLE_NAME.trim());
+            console.log(` - ID: ${row.ID}, DESCRICAO: ${row.DESCRICAO ? String(row.DESCRICAO).trim() : 'null'}`);
         });
 
-        // Let's also check if there are columns in ECF_VENDA_CABECALHO containing OBSERVACAO or other info
-        db.query(`SELECT FIRST 5 ID, OBSERVACAO, REFATURADO FROM ECF_VENDA_CABECALHO WHERE DATA_VENDA = CURRENT_DATE`, (err, rows) => {
-            if (!err && rows && rows.length > 0) {
-                console.log('\n[+] Sample rows from ECF_VENDA_CABECALHO:');
-                console.log(rows);
+        // Query some recent payments to see how they look
+        db.query(`
+            SELECT FIRST 10 P.ID, P.ID_ECF_VENDA_CABECALHO, P.ID_ECF_TIPO_PAGAMENTO, P.VALOR, TP.DESCRICAO
+            FROM ECF_TOTAL_TIPO_PAGAMENTO P
+            LEFT JOIN ECF_TIPO_PAGAMENTO TP ON TP.ID = P.ID_ECF_TIPO_PAGAMENTO
+            ORDER BY P.ID DESC
+        `, (err3, payments) => {
+            if (!err3 && payments) {
+                console.log('\n[+] Recent payments:');
+                payments.forEach(p => {
+                    console.log(` - ID: ${p.ID}, SaleID: ${p.ID_ECF_VENDA_CABECALHO}, TypeID: ${p.ID_ECF_TIPO_PAGAMENTO} (${p.DESCRICAO.trim()}), Value: ${p.VALOR}`);
+                });
+            } else if (err3) {
+                console.error('[-] Error querying recent payments:', err3.message);
             }
             db.detach();
         });

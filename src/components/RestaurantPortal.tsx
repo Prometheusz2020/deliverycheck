@@ -8,6 +8,7 @@ import {
   BarChart2, Users, ClipboardList, TrendingUp, MapPin, 
   Briefcase, LogOut, Package, User
 } from "lucide-react";
+import CreditSalesDashboard from "./CreditSalesDashboard";
 
 export default function RestaurantPortal() {
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
@@ -15,7 +16,7 @@ export default function RestaurantPortal() {
   const [summary, setSummary] = useState<DeliverySummary>({ 
     pending: 0, onRoute: 0, delivered: 0, totalValue: 0, totalFees: 0 
   });
-  const [activeTab, setActiveTab] = useState<'deliveries' | 'drivers'>('deliveries');
+  const [activeTab, setActiveTab] = useState<'deliveries' | 'drivers' | 'creditsales'>('deliveries');
   
   const [newDriverName, setNewDriverName] = useState("");
   const [newDriverPass, setNewDriverPass] = useState("");
@@ -150,6 +151,9 @@ export default function RestaurantPortal() {
             </button>
             <button onClick={() => setActiveTab('drivers')} className={activeTab === 'drivers' ? 'btn-main' : 'btn-outline'} style={{ padding: '0.6rem 1.5rem', fontSize: '12px', borderRadius: '8px', marginLeft: '0.4rem' }}>
               <Users size={16} /> Motoristas
+            </button>
+            <button onClick={() => setActiveTab('creditsales')} className={activeTab === 'creditsales' ? 'btn-main' : 'btn-outline'} style={{ padding: '0.6rem 1.5rem', fontSize: '12px', borderRadius: '8px', marginLeft: '0.4rem' }}>
+              <DollarSign size={16} /> Fiado / Prazo
             </button>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', background: 'var(--surface-high)', padding: '0.4rem 0.8rem', borderRadius: '12px', gap: '8px' }}>
@@ -578,7 +582,7 @@ export default function RestaurantPortal() {
             );
           })()}
         </div>
-      ) : (
+      ) : activeTab === 'drivers' ? (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: '2rem' }}>
           <div style={{ gridColumn: 'span 4' }}>
             <div className="card-premium">
@@ -712,6 +716,8 @@ export default function RestaurantPortal() {
             </div>
           </div>
         </div>
+      ) : (
+        <CreditSalesDashboard />
       )}
     </div>
   );
