@@ -35,9 +35,35 @@ export async function POST(req: Request) {
     // Verifica se a venda a prazo já foi importada anteriormente
     const existing = await prisma.creditSale.findUnique({
       where: { gplusId },
+      include: { items: true }
     });
 
     if (existing) {
+      // Se a venda existe, mas o payload enviado tem itens detalhados E a venda existente só tem o item genérico, atualiza os itens
+      if (items && items.length > 0) {
+        const hasOnlyGeneric = existing.items.length === 1 && existing.items[0].description.startsWith('Consumo Comanda #');
+        if (hasOnlyGeneric) {
+          await prisma.$transaction(async (tx) => {
+            // Remove o item genérico antigo
+            await tx.creditSaleItem.deleteMany({
+              where: { saleId: existing.id }
+            });
+            // Cria os novos itens detalhados
+            const itemsData = items.map((item: any) => ({
+              saleId: existing.id,
+              description: String(item.description || 'Consumo').trim(),
+              quantity: Number(item.quantity) || 1,
+              unitPrice: Number(item.unitPrice) || 0,
+              totalPrice: Number(item.totalPrice) || 0,
+            }));
+            await tx.creditSaleItem.createMany({
+              data: itemsData,
+            });
+          });
+          console.log(`[Sync API] Comanda #${orderNumber} atualizada com os itens detalhados consumidos`);
+          return NextResponse.json({ success: true, message: `Comanda #${orderNumber} atualizada com itens detalhados`, sale: existing });
+        }
+      }
       return NextResponse.json({ success: true, message: `Comanda #${orderNumber} já integrada anteriormente`, sale: existing });
     }
 
