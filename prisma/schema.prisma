@@ -53,6 +53,7 @@ model Customer {
   creditLimit     Float        @default(0) // 0 significa sem limite
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
+  gplusId         Int?         @unique // ID do cliente no banco Firebird GPlus
   
   sales           CreditSale[]
   payments        Payment[]

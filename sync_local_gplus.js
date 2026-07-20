@@ -161,6 +161,7 @@ async function syncFiadoOrdersFromToday() {
         const sql = `
             SELECT 
                 V.ID AS GPLUS_ID,
+                V.ID_CLIENTE AS GPLUS_CLIENTE_ID,
                 COALESCE(V.NCOMANDA, C.NUMERO_COMANDA, V.ID) AS NUMERO_COMANDA,
                 V.NOME_CLIENTE,
                 V.DATA_VENDA,
@@ -221,6 +222,7 @@ async function syncFiadoOrdersFromToday() {
                     gplusId: gplusId,
                     orderNumber: orderNumber,
                     customerName: customerName,
+                    gplusCustomerId: row.GPLUS_CLIENTE_ID ? parseInt(row.GPLUS_CLIENTE_ID) : null,
                     totalAmount: valorPagamento,
                     date: row.DATA_VENDA,
                     notes: `Sincronizado do GPlus (Comanda #${orderNumber} via ${String(row.TIPO_PAGAMENTO).trim()})`,

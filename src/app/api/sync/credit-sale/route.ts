@@ -14,7 +14,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Missing credit sale data" }, { status: 400 });
     }
 
-    const { gplusId, customerName, totalAmount, date, notes, orderNumber } = creditSale;
+    const { gplusId, customerName, gplusCustomerId, totalAmount, date, notes, orderNumber } = creditSale;
 
     // Se o pedido foi cancelado no GPlus, removemos do fiado se já existir na nuvem
     if (creditSale.status === "CANCELADO") {
@@ -41,24 +41,44 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: true, message: `Comanda #${orderNumber} já integrada anteriormente`, sale: existing });
     }
 
-    // Busca ou cria o cliente com o nome informado no GPlus
     const trimmedName = customerName.trim();
-    let customer = await prisma.customer.findFirst({
-      where: {
-        name: {
-          equals: trimmedName,
-          mode: "insensitive", // busca case-insensitive para evitar duplicidade por acentos/caixa alta
-        },
-      },
-    });
+    let customer = null;
 
+    // 1. Tenta buscar pelo gplusId
+    if (gplusCustomerId) {
+      customer = await prisma.customer.findUnique({
+        where: { gplusId: Number(gplusCustomerId) },
+      });
+    }
+
+    // 2. Fallback: tenta buscar pelo nome (case-insensitive)
+    if (!customer) {
+      customer = await prisma.customer.findFirst({
+        where: {
+          name: {
+            equals: trimmedName,
+            mode: "insensitive", // busca case-insensitive para evitar duplicidade por acentos/caixa alta
+          },
+        },
+      });
+    }
+
+    // 3. Se ainda não existir, cria o cliente com o ID do GPlus
     if (!customer) {
       customer = await prisma.customer.create({
         data: {
           name: trimmedName,
+          gplusId: gplusCustomerId ? Number(gplusCustomerId) : null,
         },
       });
-      console.log(`[Sync API] Novo cliente cadastrado automaticamente: ${trimmedName}`);
+      console.log(`[Sync API] Novo cliente cadastrado automaticamente: ${trimmedName} (GPlus ID: ${gplusCustomerId})`);
+    } else if (gplusCustomerId && !customer.gplusId) {
+      // Se o cliente existia mas não tinha o gplusId preenchido, atualiza
+      customer = await prisma.customer.update({
+        where: { id: customer.id },
+        data: { gplusId: Number(gplusCustomerId) },
+      });
+      console.log(`[Sync API] Cliente '${trimmedName}' atualizado com GPlus ID: ${gplusCustomerId}`);
     }
 
     // Cria a venda a prazo em transação
