@@ -9,7 +9,7 @@ import {
 import { 
   getCustomers, addCustomer, editCustomer, deleteCustomer, 
   addCreditSale, getCustomerDetails, deleteCreditSale, 
-  addPayment, deletePayment 
+  addPayment, deletePayment, getRecentCreditSales
 } from "@/lib/credit-actions";
 
 type CustomerType = {
@@ -104,6 +104,17 @@ export default function CreditSalesDashboard() {
   const [payMethod, setPayMethod] = useState("DINHEIRO");
   const [payNotes, setPayNotes] = useState("");
   const [isSubmittingPayment, setIsSubmittingPayment] = useState(false);
+  const [recentSales, setRecentSales] = useState<any[]>([]);
+
+  // Carregar as vendas recentes across todos os clientes
+  const fetchRecentSales = useCallback(async () => {
+    try {
+      const data = await getRecentCreditSales();
+      setRecentSales(data);
+    } catch (err) {
+      console.error(err);
+    }
+  }, []);
 
   // Processamento FIFO de alocação de pagamentos e agrupamento mensal
   const processedData = useMemo(() => {
@@ -191,12 +202,13 @@ export default function CreditSalesDashboard() {
     try {
       const data = await getCustomers();
       setCustomers(data as any);
+      fetchRecentSales();
     } catch (err) {
       console.error(err);
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [fetchRecentSales]);
 
   // Carregar detalhes de um cliente
   const fetchDetails = useCallback(async (id: string) => {
@@ -213,7 +225,8 @@ export default function CreditSalesDashboard() {
 
   useEffect(() => {
     fetchCustomers();
-  }, [fetchCustomers]);
+    fetchRecentSales();
+  }, [fetchCustomers, fetchRecentSales]);
 
   useEffect(() => {
     if (selectedCustomerId) {
@@ -349,6 +362,7 @@ export default function CreditSalesDashboard() {
         setSaleNotes("");
         setItemsList([]);
         fetchCustomers();
+        fetchRecentSales();
         // Redireciona e seleciona
         setSelectedCustomerId(saleCustomerId);
         setActiveTab('customers');
@@ -405,6 +419,7 @@ export default function CreditSalesDashboard() {
       const res = await deleteCreditSale(saleId);
       if (res.success) {
         fetchCustomers();
+        fetchRecentSales();
         if (selectedCustomerId) fetchDetails(selectedCustomerId);
       } else {
         alert(res.error || "Erro ao excluir venda.");
@@ -500,7 +515,58 @@ export default function CreditSalesDashboard() {
 
       {/* 1. ABA DE CLIENTES E EXTRATO (MASTER-DETAIL) */}
       {activeTab === 'customers' && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: '2rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          
+          {/* ÚLTIMOS LANÇAMENTOS FIADO */}
+          {recentSales.length > 0 && (
+            <div className="card-premium" style={{ padding: '1.2rem' }}>
+              <h3 style={{ fontSize: '11px', color: 'var(--primary)', fontWeight: 900, textTransform: 'uppercase', marginBottom: '10px', letterSpacing: '0.05em' }}>
+                Últimos Pedidos Fiados Feitos
+              </h3>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '12px' }}>
+                {recentSales.map((sale) => (
+                  <div 
+                    key={sale.id} 
+                    onClick={() => {
+                      setSelectedCustomerId(sale.customerId);
+                    }}
+                    style={{ 
+                      background: 'rgba(255,255,255,0.01)', 
+                      border: '1px solid rgba(255,255,255,0.04)', 
+                      padding: '10px 12px', 
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                      borderLeft: '3px solid var(--primary)'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = 'rgba(255,255,255,0.03)';
+                      e.currentTarget.style.borderColor = 'var(--primary)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'rgba(255,255,255,0.01)';
+                      e.currentTarget.style.borderColor = 'rgba(255,255,255,0.04)';
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '4px' }}>
+                      <span style={{ fontSize: '12px', fontWeight: 800, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '110px' }} title={sale.customerName}>
+                        {sale.customerName}
+                      </span>
+                      <span style={{ fontSize: '11px', fontWeight: 800, color: 'var(--danger)' }}>
+                        R$ {sale.totalAmount.toFixed(2)}
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px', color: 'var(--text-muted)' }}>
+                      <span>Comanda #{sale.orderNumber}</span>
+                      <span>{new Date(sale.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: '2rem' }}>
           
           {/* PAINEL DA ESQUERDA: LISTA DE CLIENTES */}
           <div style={{ gridColumn: 'span 5', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -881,7 +947,8 @@ export default function CreditSalesDashboard() {
           </div>
 
         </div>
-      )}
+      </div>
+    )}
 
       {/* 2. REGISTRAR NOVA VENDA (FIADO) */}
       {activeTab === 'new-sale' && (

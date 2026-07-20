@@ -172,20 +172,22 @@ export default function RestaurantPortal() {
         </div>
       </header>
 
-      <div className="grid-quarters" style={{ gridTemplateColumns: 'repeat(2, 1fr)' }}>
-        {[
-          { label: 'Pendentes', val: summary.pending, icon: Clock, color: 'var(--warning)' },
-          { label: 'Em Rota', val: summary.onRoute, icon: TrendingUp, color: 'var(--primary)' }
-        ].map((c, i) => (
-          <div key={i} className="card-premium" style={{ padding: '1.5rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', color: c.color, marginBottom: '1.5rem' }}>
-              <c.icon size={24} />
+      {activeTab !== 'creditsales' && (
+        <div className="grid-quarters" style={{ gridTemplateColumns: 'repeat(2, 1fr)' }}>
+          {[
+            { label: 'Pendentes', val: summary.pending, icon: Clock, color: 'var(--warning)' },
+            { label: 'Em Rota', val: summary.onRoute, icon: TrendingUp, color: 'var(--primary)' }
+          ].map((c, i) => (
+            <div key={i} className="card-premium" style={{ padding: '1.5rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: c.color, marginBottom: '1.5rem' }}>
+                <c.icon size={24} />
+              </div>
+              <p style={{ color: 'var(--text-muted)', fontSize: '10px', fontWeight: 900, textTransform: 'uppercase' }}>{c.label}</p>
+              <p style={{ fontSize: '1.5rem', fontWeight: 800 }}>{c.val}</p>
             </div>
-            <p style={{ color: 'var(--text-muted)', fontSize: '10px', fontWeight: 900, textTransform: 'uppercase' }}>{c.label}</p>
-            <p style={{ fontSize: '1.5rem', fontWeight: 800 }}>{c.val}</p>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
       {activeTab === 'deliveries' ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>

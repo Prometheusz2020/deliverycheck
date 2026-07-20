@@ -269,3 +269,37 @@ export async function deletePayment(paymentId: string) {
     return { success: false, error: "Erro ao excluir pagamento." };
   }
 }
+
+export async function getRecentCreditSales(limit: number = 6) {
+  try {
+    const sales = await prisma.creditSale.findMany({
+      take: limit,
+      orderBy: { date: "desc" },
+      include: {
+        customer: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+    });
+    return sales.map(s => {
+      const match = s.notes?.match(/Comanda\s*#(\d+)/i);
+      const comandaNum = match ? match[1] : (s.gplusId ? "GPlus" : "Manual");
+
+      return {
+        id: s.id,
+        customerId: s.customerId,
+        customerName: s.customer?.name || "Desconhecido",
+        totalAmount: s.totalAmount,
+        date: s.date.toISOString(),
+        orderNumber: comandaNum,
+        gplusId: s.gplusId
+      };
+    });
+  } catch (error) {
+    console.error("Error getting recent credit sales:", error);
+    return [];
+  }
+}
