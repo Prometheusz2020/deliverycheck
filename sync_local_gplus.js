@@ -179,11 +179,12 @@ async function syncFiadoOrdersFromToday() {
         const detailsSql = `
             SELECT 
                 D.ID_ECF_VENDA_CABECALHO AS ID_VENDA,
-                D.NOME_PROD,
+                COALESCE(D.NOME_PROD, P.DESCRICAO, P.NOME, 'Produto') AS NOME_PROD,
                 D.QUANTIDADE,
                 D.VALOR_UNITARIO,
                 D.VALOR_TOTAL
             FROM ECF_VENDA_DETALHE D
+            LEFT JOIN PRODUTO P ON (P.ID = D.ID_ECF_PRODUTO)
             JOIN ECF_VENDA_CABECALHO V ON (V.ID = D.ID_ECF_VENDA_CABECALHO)
             WHERE V.DATA_VENDA = CURRENT_DATE
               AND COALESCE(D.CANCELADO, 'N') <> 'S'
