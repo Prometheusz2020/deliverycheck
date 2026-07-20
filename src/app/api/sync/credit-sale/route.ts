@@ -41,7 +41,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: true, message: `Comanda #${orderNumber} já integrada anteriormente`, sale: existing });
     }
 
-    const trimmedName = customerName.trim();
+    // Limpa caracteres '#F' ou '#f' (e espaços extras) do nome do cliente enviado pelo GPlus
+    const cleanedName = customerName.replace(/#F/gi, "").replace(/\s+/g, " ").trim();
     let customer = null;
 
     // 1. Tenta buscar pelo gplusId
@@ -51,12 +52,12 @@ export async function POST(req: Request) {
       });
     }
 
-    // 2. Fallback: tenta buscar pelo nome (case-insensitive)
+    // 2. Fallback: tenta buscar pelo nome limpo (case-insensitive)
     if (!customer) {
       customer = await prisma.customer.findFirst({
         where: {
           name: {
-            equals: trimmedName,
+            equals: cleanedName,
             mode: "insensitive", // busca case-insensitive para evitar duplicidade por acentos/caixa alta
           },
         },
@@ -67,18 +68,18 @@ export async function POST(req: Request) {
     if (!customer) {
       customer = await prisma.customer.create({
         data: {
-          name: trimmedName,
+          name: cleanedName,
           gplusId: gplusCustomerId ? Number(gplusCustomerId) : null,
         },
       });
-      console.log(`[Sync API] Novo cliente cadastrado automaticamente: ${trimmedName} (GPlus ID: ${gplusCustomerId})`);
+      console.log(`[Sync API] Novo cliente cadastrado automaticamente: ${cleanedName} (GPlus ID: ${gplusCustomerId})`);
     } else if (gplusCustomerId && !customer.gplusId) {
       // Se o cliente existia mas não tinha o gplusId preenchido, atualiza
       customer = await prisma.customer.update({
         where: { id: customer.id },
         data: { gplusId: Number(gplusCustomerId) },
       });
-      console.log(`[Sync API] Cliente '${trimmedName}' atualizado com GPlus ID: ${gplusCustomerId}`);
+      console.log(`[Sync API] Cliente '${cleanedName}' atualizado com GPlus ID: ${gplusCustomerId}`);
     }
 
     // Cria a venda a prazo em transação
