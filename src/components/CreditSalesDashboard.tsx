@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { 
   Users, DollarSign, Plus, Trash2, Calendar, Search, 
   FileText, CheckCircle, UserPlus, Loader2, Phone, 
@@ -104,6 +104,86 @@ export default function CreditSalesDashboard() {
   const [payMethod, setPayMethod] = useState("DINHEIRO");
   const [payNotes, setPayNotes] = useState("");
   const [isSubmittingPayment, setIsSubmittingPayment] = useState(false);
+
+  // Processamento FIFO de alocação de pagamentos e agrupamento mensal
+  const processedData = useMemo(() => {
+    if (!customerDetails) return { allocatedSales: [], monthlyBreakdown: [] };
+
+    // 1. Clonar e ordenar as vendas em ordem cronológica (mais antiga para mais nova)
+    const salesSortedAsc = [...customerDetails.sales]
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+      .map(s => ({
+        ...s,
+        paidAmount: 0,
+        remainingAmount: s.totalAmount,
+        allocationStatus: 'PENDENTE' as 'PENDENTE' | 'PARCIAL' | 'PAGO'
+      }));
+
+    // 2. Clonar e ordenar os pagamentos em ordem cronológica (mais antigo para mais novo)
+    const paymentsSortedAsc = [...customerDetails.payments]
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+      .map(p => ({
+        ...p,
+        unusedAmount: p.amount
+      }));
+
+    // 3. Executar alocação FIFO
+    let paymentIdx = 0;
+    for (let sale of salesSortedAsc) {
+      while (sale.remainingAmount > 0 && paymentIdx < paymentsSortedAsc.length) {
+        const payment = paymentsSortedAsc[paymentIdx];
+        if (payment.unusedAmount <= 0) {
+          paymentIdx++;
+          continue;
+        }
+
+        if (payment.unusedAmount >= sale.remainingAmount) {
+          // O pagamento cobre totalmente o valor restante da comanda
+          payment.unusedAmount -= sale.remainingAmount;
+          sale.paidAmount += sale.remainingAmount;
+          sale.remainingAmount = 0;
+          sale.allocationStatus = 'PAGO';
+        } else {
+          // O pagamento cobre apenas parte da comanda e é totalmente consumido
+          sale.remainingAmount -= payment.unusedAmount;
+          sale.paidAmount += payment.unusedAmount;
+          payment.unusedAmount = 0;
+          sale.allocationStatus = 'PARCIAL';
+          paymentIdx++;
+        }
+      }
+    }
+
+    // 4. Re-ordenar as vendas de volta para a exibição na UI (data decrescente)
+    const allocatedSales = [...salesSortedAsc].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+    // 5. Agrupamento mensal do saldo devedor
+    const monthlyGroups = {} as { [key: string]: { monthName: string; total: number; remaining: number } };
+
+    for (const sale of salesSortedAsc) {
+      const dateObj = new Date(sale.date);
+      // Ex: "Junho de 2026"
+      const monthLabel = dateObj.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+      const key = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}`;
+
+      if (!monthlyGroups[key]) {
+        monthlyGroups[key] = {
+          monthName: monthLabel,
+          total: 0,
+          remaining: 0
+        };
+      }
+      monthlyGroups[key].total += sale.totalAmount;
+      monthlyGroups[key].remaining += sale.remainingAmount;
+    }
+
+    // Ordenar os meses cronologicamente para exibição
+    const monthlyBreakdown = Object.keys(monthlyGroups)
+      .sort((a, b) => a.localeCompare(b))
+      .map(key => monthlyGroups[key]);
+
+    return { allocatedSales, monthlyBreakdown };
+  }, [customerDetails]);
 
   // Carregar lista de clientes
   const fetchCustomers = useCallback(async () => {
@@ -644,6 +724,38 @@ export default function CreditSalesDashboard() {
                     </div>
                   </div>
 
+                  {/* Resumo por Mês (Saldo Devedor) */}
+                  {processedData.monthlyBreakdown.length > 0 && (
+                    <div style={{ background: 'rgba(255, 255, 255, 0.01)', border: '1px solid rgba(255,255,255,0.04)', padding: '1.2rem', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      <h3 style={{ fontSize: '11px', color: 'var(--primary)', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.05em', margin: 0 }}>
+                        Saldo Devedor por Mês
+                      </h3>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '12px' }}>
+                        {processedData.monthlyBreakdown.map((m, idx) => (
+                          <div key={idx} style={{ 
+                            background: 'rgba(0,0,0,0.2)', 
+                            border: m.remaining > 0 ? '1px solid rgba(255, 149, 0, 0.2)' : '1px solid rgba(52, 199, 89, 0.2)', 
+                            padding: '10px 12px', 
+                            borderRadius: '10px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '4px'
+                          }}>
+                            <p style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'capitalize', fontWeight: 600, margin: 0 }}>
+                              {m.monthName}
+                            </p>
+                            <p style={{ fontSize: '15px', fontWeight: 800, color: m.remaining > 0 ? 'var(--danger)' : 'var(--success)', margin: 0 }}>
+                              R$ {m.remaining.toFixed(2)}
+                            </p>
+                            <p style={{ fontSize: '9px', color: 'var(--text-secondary)', margin: 0 }}>
+                              Total Compras: R$ {m.total.toFixed(2)}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   {/* GRID DO EXTRATO: COMPRAS VS PAGAMENTOS */}
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
                     
@@ -654,10 +766,10 @@ export default function CreditSalesDashboard() {
                       </h3>
 
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '400px', overflowY: 'auto' }}>
-                        {customerDetails.sales.length === 0 ? (
+                        {processedData.allocatedSales.length === 0 ? (
                           <p style={{ color: 'var(--text-muted)', fontSize: '11px', fontStyle: 'italic' }}>Nenhuma compra fiado registrada.</p>
                         ) : (
-                          customerDetails.sales.map(sale => (
+                          processedData.allocatedSales.map(sale => (
                             <div key={sale.id} style={{ background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.04)', padding: '10px 12px', borderRadius: '8px', position: 'relative' }}>
                               <button 
                                 onClick={() => handleDeleteSale(sale.id)}
@@ -668,7 +780,7 @@ export default function CreditSalesDashboard() {
                               </button>
                               
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                                <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                                   {formatDate(sale.date)}
                                   {sale.gplusId && (
                                     <span style={{ 
@@ -676,19 +788,35 @@ export default function CreditSalesDashboard() {
                                       fontWeight: 800, 
                                       color: 'var(--primary)', 
                                       background: 'rgba(0, 122, 255, 0.1)', 
-                                      padding: '2px 6px', 
+                                      padding: '1px 4px', 
                                       borderRadius: '4px',
                                       letterSpacing: '0.05em' 
                                     }}>
                                       GPLUS
                                     </span>
                                   )}
+                                  <span style={{ 
+                                    fontSize: '9px', 
+                                    fontWeight: 900, 
+                                    color: sale.allocationStatus === 'PAGO' ? 'var(--success)' : sale.allocationStatus === 'PARCIAL' ? 'var(--warning)' : 'var(--danger)', 
+                                    background: sale.allocationStatus === 'PAGO' ? 'rgba(52, 199, 89, 0.1)' : sale.allocationStatus === 'PARCIAL' ? 'rgba(255, 149, 0, 0.1)' : 'rgba(255, 45, 85, 0.1)', 
+                                    padding: '1px 4px', 
+                                    borderRadius: '4px'
+                                  }}>
+                                    {sale.allocationStatus}
+                                  </span>
                                 </span>
                                 <span style={{ fontSize: '12px', fontWeight: 800, color: 'var(--danger)', marginRight: '16px' }}>
                                   R$ {sale.totalAmount.toFixed(2)}
                                 </span>
                               </div>
                               
+                              {sale.allocationStatus === 'PARCIAL' && (
+                                <p style={{ fontSize: '10px', color: 'var(--text-secondary)', marginBottom: '6px', paddingLeft: '4px', marginTop: '-2px' }}>
+                                  Pago: <strong style={{ color: 'var(--success)' }}>R$ {sale.paidAmount.toFixed(2)}</strong> | Restante: <strong style={{ color: 'var(--danger)' }}>R$ {sale.remainingAmount.toFixed(2)}</strong>
+                                </p>
+                              )}
+
                               {/* Itens da compra */}
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', borderLeft: '2px solid rgba(0, 242, 255, 0.2)', paddingLeft: '8px', marginLeft: '4px', marginBottom: '4px' }}>
                                 {sale.items.map(item => (
