@@ -39,6 +39,7 @@ type CreditSaleType = {
   totalAmount: number;
   status: string;
   notes: string | null;
+  gplusId: string | null;
   items: CreditSaleItemType[];
 };
 
@@ -667,7 +668,22 @@ export default function CreditSalesDashboard() {
                               </button>
                               
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{formatDate(sale.date)}</span>
+                                <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  {formatDate(sale.date)}
+                                  {sale.gplusId && (
+                                    <span style={{ 
+                                      fontSize: '9px', 
+                                      fontWeight: 800, 
+                                      color: 'var(--primary)', 
+                                      background: 'rgba(0, 122, 255, 0.1)', 
+                                      padding: '2px 6px', 
+                                      borderRadius: '4px',
+                                      letterSpacing: '0.05em' 
+                                    }}>
+                                      GPLUS
+                                    </span>
+                                  )}
+                                </span>
                                 <span style={{ fontSize: '12px', fontWeight: 800, color: 'var(--danger)', marginRight: '16px' }}>
                                   R$ {sale.totalAmount.toFixed(2)}
                                 </span>

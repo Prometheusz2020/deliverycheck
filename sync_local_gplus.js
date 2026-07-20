@@ -143,10 +143,115 @@ async function syncAllOrdersFromToday() {
                 }
             }
 
-            console.log(`[OK] Sincronização concluída.`);
+            console.log(`[OK] Sincronização de entregas concluída.`);
             db.detach();
         });
     });
+}
+
+async function syncFiadoOrdersFromToday() {
+    console.log(`[${new Date().toLocaleTimeString()}] Iniciando verificação de vendas a prazo (FIADO)...`);
+    
+    Firebird.attach(fbOptions, (err, db) => {
+        if (err) {
+            console.error('[-] Falha ao conectar no Firebird para FIADO:', err.message);
+            return;
+        }
+
+        const sql = `
+            SELECT 
+                V.ID AS GPLUS_ID,
+                COALESCE(V.NCOMANDA, C.NUMERO_COMANDA, V.ID) AS NUMERO_COMANDA,
+                V.NOME_CLIENTE,
+                V.DATA_VENDA,
+                P.VALOR AS VALOR_PAGAMENTO,
+                TP.DESCRICAO AS TIPO_PAGAMENTO,
+                COALESCE(V.CUPOM_CANCELADO, 'N') AS CANCELADO,
+                COALESCE(V.STATUS_VENDA, 'N') AS STATUS_VENDA
+            FROM ECF_VENDA_CABECALHO V
+            LEFT JOIN ECF_VENDA_COMANDA C ON (C.ID_VENDA_CABECALHO = V.ID)
+            JOIN ECF_TOTAL_TIPO_PAGAMENTO P ON (P.ID_ECF_VENDA_CABECALHO = V.ID)
+            JOIN ECF_TIPO_PAGAMENTO TP ON (TP.ID = P.ID_ECF_TIPO_PAGAMENTO)
+            WHERE V.DATA_VENDA = CURRENT_DATE
+        `;
+
+        db.query(sql, async (err, result) => {
+            if (err) {
+                console.error('[-] Erro na consulta SQL FIADO:', err.message);
+                db.detach();
+                return;
+            }
+
+            if (result.length === 0) {
+                console.log(`[o] Nenhuma venda a prazo encontrada hoje.`);
+                db.detach();
+                return;
+            }
+
+            // Filtro case-insensitive para formas de pagamento do FIADO
+            const fiadoKeywords = ['PRAZO', 'FIADO', 'CONVENIO', 'CONVÊNIO', 'ASSINATURA'];
+            const fiadoSales = result.filter(row => {
+                const desc = String(row.TIPO_PAGAMENTO || '').toUpperCase();
+                return fiadoKeywords.some(kw => desc.includes(kw));
+            });
+
+            if (fiadoSales.length === 0) {
+                db.detach();
+                return;
+            }
+
+            console.log(`[+] Encontradas ${fiadoSales.length} comandas com pagamento FIADO. Sincronizando...`);
+
+            for (const row of fiadoSales) {
+                const gplusId = String(row.GPLUS_ID).trim();
+                const orderNumber = String(row.NUMERO_COMANDA).trim();
+                const customerName = String(row.NOME_CLIENTE || 'Cliente GPlus').trim();
+                
+                let valorPagamento = 0;
+                if (row.VALOR_PAGAMENTO !== null && row.VALOR_PAGAMENTO !== undefined) {
+                    valorPagamento = parseFloat(String(row.VALOR_PAGAMENTO).replace(',', '.').trim());
+                }
+                if (isNaN(valorPagamento) || valorPagamento <= 0) {
+                    continue;
+                }
+
+                const isCanceled = row.CANCELADO === 'S' || row.STATUS_VENDA === 'C';
+
+                const saleData = {
+                    gplusId: gplusId,
+                    orderNumber: orderNumber,
+                    customerName: customerName,
+                    totalAmount: valorPagamento,
+                    date: row.DATA_VENDA,
+                    notes: `Sincronizado do GPlus (Comanda #${orderNumber} via ${String(row.TIPO_PAGAMENTO).trim()})`,
+                    status: isCanceled ? 'CANCELADO' : 'PENDENTE'
+                };
+
+                try {
+                    const response = await axios.post(`${VERCEL_URL}/api/sync/credit-sale`, {
+                        syncToken: SYNC_TOKEN,
+                        creditSale: saleData
+                    });
+                    if (response.data && response.data.message) {
+                        console.log(`[+] FIADO Comanda #${orderNumber} (${customerName}): ${response.data.message}`);
+                    } else {
+                        console.log(`[+] FIADO Comanda #${orderNumber} (${customerName}) sincronizada.`);
+                    }
+                } catch (apiErr) {
+                    console.error(`[-] Falha ao enviar FIADO Comanda #${orderNumber}:`, apiErr.message);
+                }
+            }
+
+            console.log(`[OK] Sincronização de FIADO concluída.`);
+            db.detach();
+        });
+    });
+}
+
+function runAllSyncJobs() {
+    syncAllOrdersFromToday();
+    // Roda a sincronização de FIADO 3 segundos depois da de entregas para evitar concorrência direta
+    setTimeout(syncFiadoOrdersFromToday, 3000);
 }
 
 // Inicia em loop
@@ -157,5 +262,5 @@ console.log(`Servidor: ${fbOptions.host}:${fbOptions.port}`);
 console.log(`Intervalo: ${POLLING_INTERVAL/1000}s`);
 console.log('=========================================');
 
-syncAllOrdersFromToday();
-setInterval(syncAllOrdersFromToday, POLLING_INTERVAL);
+runAllSyncJobs();
+setInterval(runAllSyncJobs, POLLING_INTERVAL);
