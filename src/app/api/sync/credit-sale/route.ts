@@ -14,7 +14,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Missing credit sale data" }, { status: 400 });
     }
 
-    const { gplusId, customerName, gplusCustomerId, totalAmount, date, notes, orderNumber } = creditSale;
+    const { gplusId, customerName, gplusCustomerId, totalAmount, date, notes, orderNumber, items } = creditSale;
 
     // Se o pedido foi cancelado no GPlus, removemos do fiado se já existir na nuvem
     if (creditSale.status === "CANCELADO") {
@@ -96,16 +96,29 @@ export async function POST(req: Request) {
         },
       });
 
-      // Cria um item genérico correspondente ao valor total da comanda
-      await tx.creditSaleItem.create({
-        data: {
+      // Se houver itens detalhados na comanda, cria-os; caso contrário, cria o item genérico de consumo
+      if (items && items.length > 0) {
+        const itemsData = items.map((item: any) => ({
           saleId: newSale.id,
-          description: `Consumo Comanda #${orderNumber}`,
-          quantity: 1,
-          unitPrice: totalAmount,
-          totalPrice: totalAmount,
-        },
-      });
+          description: String(item.description || 'Consumo').trim(),
+          quantity: Number(item.quantity) || 1,
+          unitPrice: Number(item.unitPrice) || 0,
+          totalPrice: Number(item.totalPrice) || 0,
+        }));
+        await tx.creditSaleItem.createMany({
+          data: itemsData,
+        });
+      } else {
+        await tx.creditSaleItem.create({
+          data: {
+            saleId: newSale.id,
+            description: `Consumo Comanda #${orderNumber}`,
+            quantity: 1,
+            unitPrice: totalAmount,
+            totalPrice: totalAmount,
+          },
+        });
+      }
 
       return newSale;
     });

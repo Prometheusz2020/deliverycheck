@@ -176,58 +176,91 @@ async function syncFiadoOrdersFromToday() {
             WHERE V.DATA_VENDA = CURRENT_DATE
         `;
 
-        db.query(sql, async (err, result) => {
-            if (err) {
-                console.error('[-] Erro na consulta SQL FIADO:', err.message);
-                db.detach();
-                return;
-            }
+        const detailsSql = `
+            SELECT 
+                D.ID_ECF_VENDA_CABECALHO AS ID_VENDA,
+                D.NOME_PROD,
+                D.QUANTIDADE,
+                D.VALOR_UNITARIO,
+                D.VALOR_TOTAL
+            FROM ECF_VENDA_DETALHE D
+            JOIN ECF_VENDA_CABECALHO V ON (V.ID = D.ID_ECF_VENDA_CABECALHO)
+            WHERE V.DATA_VENDA = CURRENT_DATE
+              AND COALESCE(D.CANCELADO, 'N') <> 'S'
+        `;
 
-            if (result.length === 0) {
-                console.log(`[o] Nenhuma venda a prazo encontrada hoje.`);
-                db.detach();
-                return;
-            }
-
-            // Filtro case-insensitive para formas de pagamento do FIADO
-            const fiadoKeywords = ['PRAZO', 'FIADO', 'CONVENIO', 'CONVÊNIO', 'ASSINATURA'];
-            const fiadoSales = result.filter(row => {
-                const desc = String(row.TIPO_PAGAMENTO || '').toUpperCase();
-                return fiadoKeywords.some(kw => desc.includes(kw));
-            });
-
-            if (fiadoSales.length === 0) {
-                db.detach();
-                return;
-            }
-
-            console.log(`[+] Encontradas ${fiadoSales.length} comandas com pagamento FIADO. Sincronizando...`);
-
-            for (const row of fiadoSales) {
-                const gplusId = String(row.GPLUS_ID).trim();
-                const orderNumber = String(row.NUMERO_COMANDA).trim();
-                const customerName = String(row.NOME_CLIENTE || 'Cliente GPlus').trim();
-                
-                let valorPagamento = 0;
-                if (row.VALOR_PAGAMENTO !== null && row.VALOR_PAGAMENTO !== undefined) {
-                    valorPagamento = parseFloat(String(row.VALOR_PAGAMENTO).replace(',', '.').trim());
+        db.query(detailsSql, (detailsErr, detailsResult) => {
+            const itemsByVenda = {};
+            if (detailsErr) {
+                console.error('[-] Erro ao carregar detalhes das comandas:', detailsErr.message);
+            } else if (detailsResult) {
+                for (const row of detailsResult) {
+                    const idVenda = row.ID_VENDA;
+                    if (!itemsByVenda[idVenda]) {
+                        itemsByVenda[idVenda] = [];
+                    }
+                    itemsByVenda[idVenda].push({
+                        description: String(row.NOME_PROD || 'Produto').trim(),
+                        quantity: parseFloat(row.QUANTIDADE || 1),
+                        unitPrice: parseFloat(row.VALOR_UNITARIO || 0),
+                        totalPrice: parseFloat(row.VALOR_TOTAL || 0)
+                    });
                 }
-                if (isNaN(valorPagamento) || valorPagamento <= 0) {
-                    continue;
+            }
+
+            db.query(sql, async (err, result) => {
+                if (err) {
+                    console.error('[-] Erro na consulta SQL FIADO:', err.message);
+                    db.detach();
+                    return;
                 }
 
-                const isCanceled = row.CANCELADO === 'S' || row.STATUS_VENDA === 'C';
+                if (result.length === 0) {
+                    console.log(`[o] Nenhuma venda a prazo encontrada hoje.`);
+                    db.detach();
+                    return;
+                }
 
-                const saleData = {
-                    gplusId: gplusId,
-                    orderNumber: orderNumber,
-                    customerName: customerName,
-                    gplusCustomerId: row.GPLUS_CLIENTE_ID ? parseInt(row.GPLUS_CLIENTE_ID) : null,
-                    totalAmount: valorPagamento,
-                    date: row.DATA_VENDA,
-                    notes: `Sincronizado do GPlus (Comanda #${orderNumber} via ${String(row.TIPO_PAGAMENTO).trim()})`,
-                    status: isCanceled ? 'CANCELADO' : 'PENDENTE'
-                };
+                // Filtro case-insensitive para formas de pagamento do FIADO
+                const fiadoKeywords = ['PRAZO', 'FIADO', 'CONVENIO', 'CONVÊNIO', 'ASSINATURA'];
+                const fiadoSales = result.filter(row => {
+                    const desc = String(row.TIPO_PAGAMENTO || '').toUpperCase();
+                    return fiadoKeywords.some(kw => desc.includes(kw));
+                });
+
+                if (fiadoSales.length === 0) {
+                    db.detach();
+                    return;
+                }
+
+                console.log(`[+] Encontradas ${fiadoSales.length} comandas com pagamento FIADO. Sincronizando...`);
+
+                for (const row of fiadoSales) {
+                    const gplusId = String(row.GPLUS_ID).trim();
+                    const orderNumber = String(row.NUMERO_COMANDA).trim();
+                    const customerName = String(row.NOME_CLIENTE || 'Cliente GPlus').trim();
+                    
+                    let valorPagamento = 0;
+                    if (row.VALOR_PAGAMENTO !== null && row.VALOR_PAGAMENTO !== undefined) {
+                        valorPagamento = parseFloat(String(row.VALOR_PAGAMENTO).replace(',', '.').trim());
+                    }
+                    if (isNaN(valorPagamento) || valorPagamento <= 0) {
+                        continue;
+                    }
+
+                    const isCanceled = row.CANCELADO === 'S' || row.STATUS_VENDA === 'C';
+
+                    const saleData = {
+                        gplusId: gplusId,
+                        orderNumber: orderNumber,
+                        customerName: customerName,
+                        gplusCustomerId: row.GPLUS_CLIENTE_ID ? parseInt(row.GPLUS_CLIENTE_ID) : null,
+                        totalAmount: valorPagamento,
+                        date: row.DATA_VENDA,
+                        notes: `Sincronizado do GPlus (Comanda #${orderNumber} via ${String(row.TIPO_PAGAMENTO).trim()})`,
+                        status: isCanceled ? 'CANCELADO' : 'PENDENTE',
+                        items: itemsByVenda[row.GPLUS_ID] || []
+                    };
 
                 try {
                     const response = await axios.post(`${VERCEL_URL}/api/sync/credit-sale`, {
@@ -248,6 +281,7 @@ async function syncFiadoOrdersFromToday() {
             db.detach();
         });
     });
+});
 }
 
 function runAllSyncJobs() {
