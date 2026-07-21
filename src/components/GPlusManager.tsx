@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import { 
   Plus, Edit, Trash2, Search, FileText, 
   CheckCircle2, AlertCircle, X, ChevronLeft, ChevronRight, 
-  Loader2, ArrowLeft, RefreshCw, Camera, Download
+  Loader2, ArrowLeft, RefreshCw, Camera, Download, Zap
 } from "lucide-react";
 import { 
   getGPlusProducts, 
@@ -42,6 +42,7 @@ export default function GPlusManager() {
   const [isScanning, setIsScanning] = useState(false);
   const [cameras, setCameras] = useState<any[]>([]);
   const [activeCameraId, setActiveCameraId] = useState<string>("");
+  const [torchOn, setTorchOn] = useState(false);
   const html5QrCodeRef = useRef<any>(null);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -215,12 +216,30 @@ export default function GPlusManager() {
   const startScanning = async () => {
     setIsScanning(true);
     setCameras([]);
+    setTorchOn(false);
     
     // Allow DOM to render the scanner container
     setTimeout(async () => {
       try {
-        const { Html5Qrcode } = await import("html5-qrcode");
-        const html5QrCode = new Html5Qrcode("scanner-preview");
+        const { Html5Qrcode, Html5QrcodeSupportedFormats } = await import("html5-qrcode");
+        
+        const formatsToSupport = [
+          Html5QrcodeSupportedFormats.EAN_13,
+          Html5QrcodeSupportedFormats.EAN_8,
+          Html5QrcodeSupportedFormats.CODE_128,
+          Html5QrcodeSupportedFormats.CODE_39,
+          Html5QrcodeSupportedFormats.UPC_A,
+          Html5QrcodeSupportedFormats.UPC_E,
+          Html5QrcodeSupportedFormats.QR_CODE,
+          Html5QrcodeSupportedFormats.ITF,
+          Html5QrcodeSupportedFormats.AZTEC,
+          Html5QrcodeSupportedFormats.DATA_MATRIX,
+        ];
+
+        const html5QrCode = new Html5Qrcode("scanner-preview", {
+          formatsToSupport,
+          verbose: false,
+        });
         html5QrCodeRef.current = html5QrCode;
 
         const devices = await Html5Qrcode.getCameras();
@@ -246,18 +265,29 @@ export default function GPlusManager() {
     }, 200);
   };
 
+  const getScanConfig = () => ({
+    fps: 20,
+    qrbox: (viewfinderWidth: number, viewfinderHeight: number) => {
+      const width = Math.min(Math.floor(viewfinderWidth * 0.85), 360);
+      const height = Math.min(Math.floor(viewfinderHeight * 0.45), 180);
+      return { width: Math.max(width, 240), height: Math.max(height, 120) };
+    },
+    aspectRatio: 1.333333,
+    experimentalFeatures: {
+      useBarCodeDetectorIfSupported: true,
+    },
+    videoConstraints: {
+      facingMode: "environment",
+      width: { min: 640, ideal: 1280, max: 1920 },
+      height: { min: 480, ideal: 720, max: 1080 },
+    },
+  });
+
   const startCamera = async (scannerInstance: any, cameraId: string) => {
     try {
       await scannerInstance.start(
         cameraId,
-        {
-          fps: 10,
-          qrbox: (width: number, height: number) => {
-            const boxWidth = Math.min(width * 0.8, 300);
-            const boxHeight = Math.min(height * 0.4, 150);
-            return { width: boxWidth, height: boxHeight };
-          },
-        },
+        getScanConfig(),
         (decodedText: string) => {
           handleScanSuccess(decodedText);
         },
@@ -273,14 +303,7 @@ export default function GPlusManager() {
     try {
       await scannerInstance.start(
         { facingMode: "environment" },
-        {
-          fps: 10,
-          qrbox: (width: number, height: number) => {
-            const boxWidth = Math.min(width * 0.8, 300);
-            const boxHeight = Math.min(height * 0.4, 150);
-            return { width: boxWidth, height: boxHeight };
-          },
-        },
+        getScanConfig(),
         (decodedText: string) => {
           handleScanSuccess(decodedText);
         },
@@ -295,6 +318,7 @@ export default function GPlusManager() {
   const switchCamera = async (cameraId: string) => {
     if (!html5QrCodeRef.current) return;
     try {
+      setTorchOn(false);
       await html5QrCodeRef.current.stop();
       setActiveCameraId(cameraId);
       await startCamera(html5QrCodeRef.current, cameraId);
@@ -304,9 +328,24 @@ export default function GPlusManager() {
     }
   };
 
+  const toggleTorch = async () => {
+    if (!html5QrCodeRef.current) return;
+    try {
+      const newState = !torchOn;
+      await html5QrCodeRef.current.applyVideoConstraints({
+        advanced: [{ torch: newState }]
+      });
+      setTorchOn(newState);
+    } catch (e) {
+      console.error("Torch error:", e);
+      showNotification("error", "Flash não suportado neste dispositivo.");
+    }
+  };
+
   const stopScanning = async () => {
     if (html5QrCodeRef.current) {
       try {
+        setTorchOn(false);
         await html5QrCodeRef.current.stop();
       } catch (err) {
         console.error("Error stopping camera:", err);
@@ -716,14 +755,32 @@ export default function GPlusManager() {
           <div className="card-premium animate-entrance" style={{ width: "100%", maxWidth: "500px", position: "relative", border: "1px solid rgba(0, 242, 255, 0.3)" }}>
             {/* Header */}
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
-              <h4 style={{ color: "var(--primary)" }}>Escritório GPlus - Scanner</h4>
-              <button 
-                type="button"
-                onClick={stopScanning}
-                style={{ background: "transparent", border: "none", color: "var(--text-secondary)", cursor: "pointer", marginLeft: "auto" }}
-              >
-                <X size={20} />
-              </button>
+              <h4 style={{ color: "var(--primary)", display: "flex", alignItems: "center", gap: "8px" }}>
+                <Camera size={18} /> Scanner de Código de Barras
+              </h4>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginLeft: "auto" }}>
+                <button
+                  type="button"
+                  onClick={toggleTorch}
+                  className="btn-outline"
+                  style={{
+                    padding: "0.4rem 0.8rem",
+                    fontSize: "12px",
+                    borderColor: torchOn ? "var(--warning)" : "rgba(255,255,255,0.1)",
+                    color: torchOn ? "var(--warning)" : "var(--text-secondary)"
+                  }}
+                  title="Alternar Flash"
+                >
+                  <Zap size={14} /> {torchOn ? "Flash ON" : "Flash"}
+                </button>
+                <button 
+                  type="button"
+                  onClick={stopScanning}
+                  style={{ background: "transparent", border: "none", color: "var(--text-secondary)", cursor: "pointer", padding: "0.2rem" }}
+                >
+                  <X size={20} />
+                </button>
+              </div>
             </div>
 
             {/* Camera selection dropdown */}
@@ -757,25 +814,25 @@ export default function GPlusManager() {
                 position: "absolute",
                 top: "50%", left: "50%",
                 transform: "translate(-50%, -50%)",
-                width: "80%", height: "40%",
+                width: "85%", height: "45%",
                 border: "2px dashed var(--primary)",
-                borderRadius: "8px",
-                boxShadow: "0 0 15px rgba(0, 242, 255, 0.3)",
+                borderRadius: "10px",
+                boxShadow: "0 0 25px rgba(0, 242, 255, 0.4)",
                 pointerEvents: "none",
                 zIndex: 10
               }}>
                 <div style={{
                   position: "absolute",
-                  top: 0, left: 0, width: "100%", height: "2px",
-                  background: "var(--primary)",
-                  boxShadow: "0 0 8px var(--primary)",
-                  animation: "laser 2s ease-in-out infinite"
+                  top: 0, left: 0, width: "100%", height: "3px",
+                  background: "linear-gradient(90deg, transparent, var(--primary), transparent)",
+                  boxShadow: "0 0 12px var(--primary)",
+                  animation: "laser 1.8s ease-in-out infinite"
                 }}></div>
               </div>
             </div>
 
-            <p style={{ color: "var(--text-muted)", fontSize: "11px", textAlign: "center", marginTop: "1rem", letterSpacing: "0.05em" }}>
-              Aponte a câmera para o código de barras do produto.
+            <p style={{ color: "var(--text-secondary)", fontSize: "12px", textAlign: "center", marginTop: "1rem", fontWeight: 600 }}>
+              Aponte a câmera diretamente para o código de barras EAN / QR Code.
             </p>
 
             <button 
