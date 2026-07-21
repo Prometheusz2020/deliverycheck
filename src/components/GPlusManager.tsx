@@ -414,83 +414,80 @@ export default function GPlusManager() {
     if (!file) return;
 
     try {
-      showNotification("success", "Lendo código de barras da imagem...");
-      const { Html5Qrcode, Html5QrcodeSupportedFormats } = await import("html5-qrcode");
+      showNotification("success", "🤖 IA Gemini lendo foto do código de barras...");
       
-      const formatsToSupport = [
-        Html5QrcodeSupportedFormats.EAN_13,
-        Html5QrcodeSupportedFormats.EAN_8,
-        Html5QrcodeSupportedFormats.CODE_128,
-        Html5QrcodeSupportedFormats.CODE_39,
-        Html5QrcodeSupportedFormats.UPC_A,
-        Html5QrcodeSupportedFormats.UPC_E,
-        Html5QrcodeSupportedFormats.QR_CODE,
-        Html5QrcodeSupportedFormats.ITF,
-        Html5QrcodeSupportedFormats.AZTEC,
-        Html5QrcodeSupportedFormats.DATA_MATRIX,
-      ];
-
-      const tempScanner = new Html5Qrcode("temp-file-scanner", {
-        formatsToSupport,
-        verbose: false,
-      });
-
       let decodedText: string | null = null;
 
-      // Pass 1: Direct Original File Scan
+      // Pass 1: AI Vision Gemini API (highest accuracy for smartphone photos)
       try {
-        decodedText = await tempScanner.scanFile(file, false);
+        const base64 = await fileToBase64(file);
+        const aiRes = await extractBarcodeWithAI(base64);
+        if (aiRes.success && aiRes.barcode) {
+          decodedText = aiRes.barcode;
+        }
       } catch (err) {
-        // Ignored, fallback to pass 2
+        console.error("AI Vision extraction error:", err);
       }
 
-      // Pass 2: Resized to 800px (ideal resolution for ZXing 1D barcode scan engine)
+      // Pass 2: Local ZXing Canvas Multi-Scale Scanner (Fallback if AI key is missing or missed it)
       if (!decodedText) {
-        try {
-          const scaledFile800 = await preprocessImage(file, 800, false);
-          decodedText = await tempScanner.scanFile(scaledFile800, false);
-        } catch (err) {
-          // Ignored, fallback to pass 3
-        }
-      }
+        const { Html5Qrcode, Html5QrcodeSupportedFormats } = await import("html5-qrcode");
+        
+        const formatsToSupport = [
+          Html5QrcodeSupportedFormats.EAN_13,
+          Html5QrcodeSupportedFormats.EAN_8,
+          Html5QrcodeSupportedFormats.CODE_128,
+          Html5QrcodeSupportedFormats.CODE_39,
+          Html5QrcodeSupportedFormats.UPC_A,
+          Html5QrcodeSupportedFormats.UPC_E,
+          Html5QrcodeSupportedFormats.QR_CODE,
+          Html5QrcodeSupportedFormats.ITF,
+        ];
 
-      // Pass 3: Resized to 1000px with High Contrast Binarization
-      if (!decodedText) {
-        try {
-          const contrastFile = await preprocessImage(file, 1000, true);
-          decodedText = await tempScanner.scanFile(contrastFile, false);
-        } catch (err) {
-          // Ignored, fallback to AI Vision
-        }
-      }
+        const tempScanner = new Html5Qrcode("temp-file-scanner", {
+          formatsToSupport,
+          verbose: false,
+        });
 
-      try {
-        tempScanner.clear();
-      } catch (e) {
-        // Ignored
-      }
-
-      // Pass 4: AI Vision Gemini API Fallback
-      if (!decodedText) {
+        // 2a. Original file
         try {
-          const base64 = await fileToBase64(file);
-          const aiRes = await extractBarcodeWithAI(base64);
-          if (aiRes.success && aiRes.barcode) {
-            decodedText = aiRes.barcode;
-          }
-        } catch (err) {
-          console.error("AI Vision extraction error:", err);
+          decodedText = await tempScanner.scanFile(file, false);
+        } catch (err) {}
+
+        // 2b. Scaled to 800px
+        if (!decodedText) {
+          try {
+            const scaledFile800 = await preprocessImage(file, 800, false);
+            decodedText = await tempScanner.scanFile(scaledFile800, false);
+          } catch (err) {}
         }
+
+        // 2c. Scaled to 1000px with High Contrast
+        if (!decodedText) {
+          try {
+            const contrastFile = await preprocessImage(file, 1000, true);
+            decodedText = await tempScanner.scanFile(contrastFile, false);
+          } catch (err) {}
+        }
+
+        try {
+          tempScanner.clear();
+        } catch (e) {}
       }
 
       if (decodedText) {
-        handleScanSuccess(decodedText);
+        playBeep();
+        setFormCodigo(decodedText);
+        showNotification("success", `🤖 Código identificado: ${decodedText}`);
+        if (isScanning) {
+          stopScanning();
+        }
       } else {
-        showNotification("error", "Não foi possível ler o código na foto. Tente aproximação com mais nitidez.");
+        showNotification("error", "Não foi possível identificar o código na foto. Certifique-se de que os números abaixo do código estejam visíveis.");
       }
     } catch (err: any) {
       console.error("Image file scan error:", err);
-      showNotification("error", "Erro ao processar imagem. Tente tirar a foto com foco no código.");
+      showNotification("error", "Erro ao processar a imagem. Tente tirar a foto com foco.");
     } finally {
       e.target.value = "";
     }

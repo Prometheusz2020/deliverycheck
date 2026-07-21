@@ -192,13 +192,16 @@ export async function extractBarcodeWithAI(base64Image: string) {
 
     const data = await response.json();
     const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
-    const cleanDigits = rawText.replace(/[^\w]/g, "");
+
+    // Extract barcode digits (prefer 8 to 14 digit sequence typical of EAN-13, EAN-8, UPC, or any digit group)
+    const digitMatch = rawText.match(/\d{8,14}/) || rawText.match(/\d{4,14}/) || rawText.match(/\d+/);
+    const cleanDigits = digitMatch ? digitMatch[0] : "";
 
     if (cleanDigits && cleanDigits.toUpperCase() !== "NONE") {
       return { success: true, barcode: cleanDigits };
     }
 
-    return { success: false, error: "Código de barras não identificado pela IA." };
+    return { success: false, error: "Código de barras não identificado pela IA na foto." };
   } catch (error) {
     console.error("Error in extractBarcodeWithAI:", error);
     return { success: false, error: "Erro no serviço de IA." };
