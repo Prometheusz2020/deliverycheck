@@ -94,3 +94,15 @@ model Payment {
   notes           String?
   createdAt       DateTime @default(now())
 }
+
+model ProdutoGPlus {
+  id             String   @id @default(uuid())
+  nome           String
+  grupo          String?
+  valor          Float
+  codigoDeBarras String?  @map("codigo_de_barras")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@map("produtos_gplus")
+}
