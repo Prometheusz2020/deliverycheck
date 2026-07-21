@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import { 
   Plus, Edit, Trash2, Search, FileText, 
   CheckCircle2, AlertCircle, X, ChevronLeft, ChevronRight, 
-  Loader2, ArrowLeft, RefreshCw, Camera, Download, Zap
+  Loader2, ArrowLeft, RefreshCw, Camera, Download, Zap, Upload
 } from "lucide-react";
 import { 
   getGPlusProducts, 
@@ -266,21 +266,13 @@ export default function GPlusManager() {
   };
 
   const getScanConfig = () => ({
-    fps: 20,
+    fps: 15,
     qrbox: (viewfinderWidth: number, viewfinderHeight: number) => {
-      const width = Math.min(Math.floor(viewfinderWidth * 0.85), 360);
-      const height = Math.min(Math.floor(viewfinderHeight * 0.45), 180);
-      return { width: Math.max(width, 240), height: Math.max(height, 120) };
+      const width = Math.min(Math.floor(viewfinderWidth * 0.9), 350);
+      const height = Math.min(Math.floor(viewfinderHeight * 0.5), 180);
+      return { width: Math.max(width, 220), height: Math.max(height, 100) };
     },
     aspectRatio: 1.333333,
-    experimentalFeatures: {
-      useBarCodeDetectorIfSupported: true,
-    },
-    videoConstraints: {
-      facingMode: "environment",
-      width: { min: 640, ideal: 1280, max: 1920 },
-      height: { min: 480, ideal: 720, max: 1080 },
-    },
   });
 
   const startCamera = async (scannerInstance: any, cameraId: string) => {
@@ -360,6 +352,47 @@ export default function GPlusManager() {
     setFormCodigo(decodedText);
     showNotification("success", `Código escaneado: ${decodedText}`);
     stopScanning();
+  };
+
+  const handleScanImageFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      showNotification("success", "Analisando código de barras da imagem...");
+      const { Html5Qrcode, Html5QrcodeSupportedFormats } = await import("html5-qrcode");
+      
+      const formatsToSupport = [
+        Html5QrcodeSupportedFormats.EAN_13,
+        Html5QrcodeSupportedFormats.EAN_8,
+        Html5QrcodeSupportedFormats.CODE_128,
+        Html5QrcodeSupportedFormats.CODE_39,
+        Html5QrcodeSupportedFormats.UPC_A,
+        Html5QrcodeSupportedFormats.UPC_E,
+        Html5QrcodeSupportedFormats.QR_CODE,
+        Html5QrcodeSupportedFormats.ITF,
+        Html5QrcodeSupportedFormats.AZTEC,
+        Html5QrcodeSupportedFormats.DATA_MATRIX,
+      ];
+
+      const tempScanner = new Html5Qrcode("temp-file-scanner", {
+        formatsToSupport,
+        verbose: false,
+      });
+
+      const decodedText = await tempScanner.scanFile(file, false);
+      if (decodedText) {
+        handleScanSuccess(decodedText);
+      } else {
+        showNotification("error", "Nenhum código identificado na foto.");
+      }
+      await tempScanner.clear();
+    } catch (err: any) {
+      console.error("Image file scan error:", err);
+      showNotification("error", "Código não identificado. Tente tirar a foto com mais nitidez.");
+    } finally {
+      e.target.value = "";
+    }
   };
 
 
@@ -510,11 +543,25 @@ export default function GPlusManager() {
                     type="button" 
                     onClick={startScanning} 
                     className="btn-outline" 
-                    style={{ padding: "0 1rem", display: "flex", alignItems: "center", justifyContent: "center", minHeight: "44px" }}
-                    title="Escanear com a câmera do celular"
+                    style={{ padding: "0 0.8rem", display: "flex", alignItems: "center", justifyContent: "center", minHeight: "44px" }}
+                    title="Escanear com a câmera ao vivo"
                   >
                     <Camera size={20} />
                   </button>
+                  <label 
+                    className="btn-outline" 
+                    style={{ padding: "0 0.8rem", display: "flex", alignItems: "center", justifyContent: "center", minHeight: "44px", cursor: "pointer" }}
+                    title="Tirar foto ou selecionar imagem do código de barras"
+                  >
+                    <Upload size={20} />
+                    <input 
+                      type="file" 
+                      accept="image/*" 
+                      capture="environment" 
+                      onChange={handleScanImageFile} 
+                      style={{ display: "none" }} 
+                    />
+                  </label>
                 </div>
               </div>
 
@@ -835,17 +882,35 @@ export default function GPlusManager() {
               Aponte a câmera diretamente para o código de barras EAN / QR Code.
             </p>
 
-            <button 
-              type="button"
-              onClick={stopScanning} 
-              className="btn-outline" 
-              style={{ width: "100%", marginTop: "1rem", padding: "0.8rem" }}
-            >
-              Cancelar
-            </button>
+            <div style={{ display: "flex", gap: "10px", marginTop: "1rem" }}>
+              <label 
+                className="btn-outline" 
+                style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", cursor: "pointer", padding: "0.8rem", fontSize: "12px" }}
+              >
+                <Upload size={16} /> Tirar Foto / Imagem
+                <input 
+                  type="file" 
+                  accept="image/*" 
+                  capture="environment" 
+                  onChange={handleScanImageFile} 
+                  style={{ display: "none" }} 
+                />
+              </label>
+              <button 
+                type="button"
+                onClick={stopScanning} 
+                className="btn-outline" 
+                style={{ flex: 1, padding: "0.8rem" }}
+              >
+                Cancelar
+              </button>
+            </div>
           </div>
         </div>
       )}
+
+      {/* Hidden container for temp file scanner */}
+      <div id="temp-file-scanner" style={{ display: "none" }}></div>
 
       {/* Embedded Animations and hover CSS rules */}
       <style jsx>{`
