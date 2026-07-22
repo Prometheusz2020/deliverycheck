@@ -134,7 +134,7 @@ export async function extractBarcodeWithAI(base64Image: string) {
     const cleanBase64 = base64Image.replace(/^data:image\/\w+;base64,/, "");
 
     let response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -159,9 +159,9 @@ export async function extractBarcodeWithAI(base64Image: string) {
     );
 
     if (!response.ok) {
-      // Fallback to gemini-2.0-flash if 1.5-flash returns error
+      // Fallback to gemini-2.5-flash
       response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
