@@ -85,6 +85,19 @@ export default function GPlusManager({ session }: GPlusManagerProps) {
         }
       });
 
+      // Enable continuous autofocus if supported by camera hardware
+      try {
+        const track = stream.getVideoTracks()[0];
+        if (track && track.applyConstraints) {
+          const capabilities: any = track.getCapabilities ? track.getCapabilities() : {};
+          if (capabilities.focusMode && Array.isArray(capabilities.focusMode) && capabilities.focusMode.includes("continuous")) {
+            await track.applyConstraints({
+              advanced: [{ focusMode: "continuous" }] as any
+            });
+          }
+        }
+      } catch (e) {}
+
       mediaStreamRef.current = stream;
 
       setTimeout(() => {
@@ -766,8 +779,11 @@ export default function GPlusManager({ session }: GPlusManagerProps) {
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
-          justifyContent: "center",
-          padding: "0.5rem"
+          justifyContent: "flex-start",
+          paddingTop: "calc(0.8rem + env(safe-area-inset-top, 0px))",
+          paddingLeft: "0.5rem",
+          paddingRight: "0.5rem",
+          paddingBottom: "0.5rem"
         }}>
           <div style={{
             position: "relative",
@@ -886,51 +902,6 @@ export default function GPlusManager({ session }: GPlusManagerProps) {
             </h3>
             
             <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "1.2rem" }}>
-              {/* Código de Barras FIRST for quick mobile camera scanning without scrolling */}
-              <div>
-                <label style={{ fontSize: "11px", color: "var(--text-secondary)", fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: "6px" }}>
-                  Código de Barras
-                </label>
-                <div style={{ display: "flex", gap: "8px" }}>
-                  <input 
-                    ref={codigoInputRef}
-                    type="text" 
-                    value={formCodigo} 
-                    onChange={e => setFormCodigo(e.target.value)} 
-                    className="input-premium" 
-                    placeholder="Ex: 7891000123456" 
-                  />
-                  <button 
-                    type="button" 
-                    onClick={startScanning} 
-                    className="btn-outline" 
-                    style={{ padding: "0 0.8rem", display: "flex", alignItems: "center", justifyContent: "center", minHeight: "44px" }}
-                    title="Escanear com a câmera ao vivo (Tempo Real)"
-                  >
-                    <Camera size={20} />
-                  </button>
-                  <label 
-                    className="btn-outline" 
-                    style={{ padding: "0 0.8rem", display: "flex", alignItems: "center", justifyContent: "center", minHeight: "44px", cursor: "pointer" }}
-                    title="Tirar foto ou selecionar imagem da galeria"
-                  >
-                    <Upload size={20} />
-                    <input 
-                      type="file" 
-                      accept="image/*" 
-                      capture="environment" 
-                      onChange={handleScanImageFile} 
-                      style={{ display: "none" }} 
-                    />
-                  </label>
-                </div>
-                {formCodigo.trim() && findDuplicateBarcodeProduct(formCodigo, formId) && (
-                  <span style={{ color: "var(--warning)", fontSize: "11px", marginTop: "4px", display: "block", fontWeight: 600 }}>
-                    ⚠️ Este código de barras já pertence ao produto: "{findDuplicateBarcodeProduct(formCodigo, formId)?.nome}"
-                  </span>
-                )}
-              </div>
-
               <div ref={autocompleteRef} style={{ position: "relative" }}>
                 <label style={{ fontSize: "11px", color: "var(--text-secondary)", fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: "6px" }}>
                   Nome do Produto <span style={{ color: "var(--danger)" }}>*</span>
@@ -1043,6 +1014,50 @@ export default function GPlusManager({ session }: GPlusManagerProps) {
                     required
                   />
                 </div>
+              </div>
+
+              <div>
+                <label style={{ fontSize: "11px", color: "var(--text-secondary)", fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: "6px" }}>
+                  Código de Barras
+                </label>
+                <div style={{ display: "flex", gap: "8px" }}>
+                  <input 
+                    ref={codigoInputRef}
+                    type="text" 
+                    value={formCodigo} 
+                    onChange={e => setFormCodigo(e.target.value)} 
+                    className="input-premium" 
+                    placeholder="Ex: 7891000123456" 
+                  />
+                  <button 
+                    type="button" 
+                    onClick={startScanning} 
+                    className="btn-outline" 
+                    style={{ padding: "0 0.8rem", display: "flex", alignItems: "center", justifyContent: "center", minHeight: "44px" }}
+                    title="Escanear com a câmera ao vivo (Tempo Real)"
+                  >
+                    <Camera size={20} />
+                  </button>
+                  <label 
+                    className="btn-outline" 
+                    style={{ padding: "0 0.8rem", display: "flex", alignItems: "center", justifyContent: "center", minHeight: "44px", cursor: "pointer" }}
+                    title="Tirar foto ou selecionar imagem da galeria"
+                  >
+                    <Upload size={20} />
+                    <input 
+                      type="file" 
+                      accept="image/*" 
+                      capture="environment" 
+                      onChange={handleScanImageFile} 
+                      style={{ display: "none" }} 
+                    />
+                  </label>
+                </div>
+                {formCodigo.trim() && findDuplicateBarcodeProduct(formCodigo, formId) && (
+                  <span style={{ color: "var(--warning)", fontSize: "11px", marginTop: "4px", display: "block", fontWeight: 600 }}>
+                    ⚠️ Este código de barras já pertence ao produto: "{findDuplicateBarcodeProduct(formCodigo, formId)?.nome}"
+                  </span>
+                )}
               </div>
 
               <div style={{ display: "flex", gap: "10px", marginTop: "1rem" }}>
