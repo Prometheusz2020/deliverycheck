@@ -397,47 +397,71 @@ export default function GPlusManager({ session }: GPlusManagerProps) {
     setIsScanning(true);
     setCameras([]);
     setTorchOn(false);
-    
-    // Allow DOM to render the scanner container
-    setTimeout(async () => {
-      try {
-        const { Html5Qrcode, Html5QrcodeSupportedFormats } = await import("html5-qrcode");
-        
-        const formatsToSupport = [
-          Html5QrcodeSupportedFormats.EAN_13,
-          Html5QrcodeSupportedFormats.EAN_8,
-          Html5QrcodeSupportedFormats.CODE_128,
-          Html5QrcodeSupportedFormats.CODE_39,
-          Html5QrcodeSupportedFormats.UPC_A,
-          Html5QrcodeSupportedFormats.UPC_E,
-          Html5QrcodeSupportedFormats.QR_CODE,
-          Html5QrcodeSupportedFormats.ITF,
-          Html5QrcodeSupportedFormats.AZTEC,
-          Html5QrcodeSupportedFormats.DATA_MATRIX,
-        ];
 
-        const html5QrCode = new Html5Qrcode("scanner-preview", {
-          formatsToSupport,
-          verbose: false,
-        });
-        html5QrCodeRef.current = html5QrCode;
-
-        // Start back camera directly via facingMode constraint
-        await startCameraWithFacingMode(html5QrCode);
-
-        // Fetch camera list in background for switcher button
+    try {
+      // Prompt camera permissions explicitly on user click (required for iOS Safari and Android Chrome)
+      if (typeof navigator !== "undefined" && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
         try {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: { ideal: "environment" } }
+          });
+          // Stop stream tracks so Html5Qrcode can bind to the device
+          stream.getTracks().forEach((track) => track.stop());
+        } catch (permErr) {
+          console.warn("getUserMedia permission prompt notice:", permErr);
+        }
+      }
+
+      // Allow DOM to render the scanner container
+      setTimeout(async () => {
+        try {
+          const { Html5Qrcode, Html5QrcodeSupportedFormats } = await import("html5-qrcode");
+
+          const formatsToSupport = [
+            Html5QrcodeSupportedFormats.EAN_13,
+            Html5QrcodeSupportedFormats.EAN_8,
+            Html5QrcodeSupportedFormats.CODE_128,
+            Html5QrcodeSupportedFormats.CODE_39,
+            Html5QrcodeSupportedFormats.UPC_A,
+            Html5QrcodeSupportedFormats.UPC_E,
+            Html5QrcodeSupportedFormats.QR_CODE,
+            Html5QrcodeSupportedFormats.ITF,
+          ];
+
+          const html5QrCode = new Html5Qrcode("scanner-preview", {
+            formatsToSupport,
+            verbose: false,
+          });
+          html5QrCodeRef.current = html5QrCode;
+
           const devices = await Html5Qrcode.getCameras();
           if (devices && devices.length > 0) {
             setCameras(devices);
+            const backCamera = devices.find((d) =>
+              d.label.toLowerCase().includes("back") ||
+              d.label.toLowerCase().includes("traseira") ||
+              d.label.toLowerCase().includes("environment") ||
+              d.label.toLowerCase().includes("rear")
+            );
+            const selectedId = backCamera ? backCamera.id : devices[devices.length - 1].id;
+            setActiveCameraId(selectedId);
+            await startCamera(html5QrCode, selectedId);
+          } else {
+            await startCameraWithFacingMode(html5QrCode);
           }
-        } catch (e) {}
-      } catch (err) {
-        console.error("Camera access error:", err);
-        showNotification("error", "Não foi possível acessar a câmera. Verifique as permissões de câmera no seu navegador.");
-        setIsScanning(false);
-      }
-    }, 250);
+        } catch (err: any) {
+          console.error("Camera access error:", err);
+          showNotification(
+            "error",
+            "Erro ao abrir a câmera: " + (err?.message || "Verifique se você permitiu o acesso à câmera no navegador.")
+          );
+          setIsScanning(false);
+        }
+      }, 300);
+    } catch (err: any) {
+      console.error("Scanning start error:", err);
+      setIsScanning(false);
+    }
   };
 
   const getScanConfig = () => ({
@@ -1005,25 +1029,29 @@ export default function GPlusManager({ session }: GPlusManagerProps) {
                     className="input-premium" 
                     placeholder="Ex: 7891000123456" 
                   />
-                  <button 
-                    type="button" 
-                    onClick={startScanning} 
-                    className="btn-outline" 
-                    style={{ padding: "0 0.8rem", display: "flex", alignItems: "center", justifyContent: "center", minHeight: "44px" }}
-                    title="Escanear com a câmera ao vivo (Leitura Instantânea)"
-                  >
-                    <Camera size={20} />
-                  </button>
                   <label 
                     className="btn-outline" 
                     style={{ padding: "0 0.8rem", display: "flex", alignItems: "center", justifyContent: "center", minHeight: "44px", cursor: "pointer" }}
-                    title="Tirar foto ou selecionar imagem do código de barras"
+                    title="Tirar foto do código de barras usando a câmera do celular"
+                  >
+                    <Camera size={20} />
+                    <input 
+                      type="file" 
+                      accept="image/*" 
+                      capture="environment" 
+                      onChange={handleScanImageFile} 
+                      style={{ display: "none" }} 
+                    />
+                  </label>
+                  <label 
+                    className="btn-outline" 
+                    style={{ padding: "0 0.8rem", display: "flex", alignItems: "center", justifyContent: "center", minHeight: "44px", cursor: "pointer" }}
+                    title="Selecionar foto da galeria"
                   >
                     <Upload size={20} />
                     <input 
                       type="file" 
                       accept="image/*" 
-                      capture="environment" 
                       onChange={handleScanImageFile} 
                       style={{ display: "none" }} 
                     />
