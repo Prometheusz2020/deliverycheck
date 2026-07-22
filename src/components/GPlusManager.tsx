@@ -767,12 +767,13 @@ export default function GPlusManager({ session }: GPlusManagerProps) {
           flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
-          padding: "1rem"
+          padding: "0.5rem"
         }}>
           <div style={{
             position: "relative",
             width: "100%",
-            maxWidth: "460px",
+            maxWidth: "420px",
+            maxHeight: "92vh",
             background: "var(--surface-mid)",
             border: "1px solid var(--glass-border)",
             borderRadius: "20px",
@@ -780,20 +781,20 @@ export default function GPlusManager({ session }: GPlusManagerProps) {
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
-            padding: "1.2rem",
+            padding: "0.8rem 1rem",
             boxShadow: "0 20px 50px rgba(0,0,0,0.8)"
           }}>
-            <div style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
-              <span style={{ fontWeight: 700, fontSize: "14px", color: "var(--primary)", display: "flex", alignItems: "center", gap: "6px" }}>
-                <Camera size={18} /> CÂMERA AO VIVO (TEMPO REAL)
+            <div style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.6rem" }}>
+              <span style={{ fontWeight: 700, fontSize: "13px", color: "var(--primary)", display: "flex", alignItems: "center", gap: "6px" }}>
+                <Camera size={16} /> CÂMERA AO VIVO (TEMPO REAL)
               </span>
-              <button onClick={stopScanning} className="btn-outline" style={{ padding: "0.4rem 0.8rem", fontSize: "12px", gap: "4px", display: "flex", alignItems: "center" }}>
-                <X size={16} /> Fechar
+              <button onClick={stopScanning} className="btn-outline" style={{ padding: "0.3rem 0.7rem", fontSize: "12px", gap: "4px", display: "flex", alignItems: "center" }}>
+                <X size={15} /> Fechar
               </button>
             </div>
 
-            {/* Direct Native Video Stream - Bound directly to getUserMedia stream */}
-            <div style={{ position: "relative", width: "100%", height: "290px", borderRadius: "12px", overflow: "hidden", background: "#000" }}>
+            {/* Direct Native Video Stream - Fitted for mobile viewports */}
+            <div style={{ position: "relative", width: "100%", height: "220px", maxHeight: "40vh", borderRadius: "12px", overflow: "hidden", background: "#000" }}>
               <video
                 ref={liveVideoRef}
                 autoPlay
@@ -813,12 +814,12 @@ export default function GPlusManager({ session }: GPlusManagerProps) {
               }}></div>
             </div>
 
-            <p style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "0.8rem", textAlign: "center" }}>
-              Aponte a câmera para o código de barras do produto
+            <p style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "0.5rem", textAlign: "center" }}>
+              Aponte a câmera para o código de barras
             </p>
 
-            <div style={{ display: "flex", gap: "10px", marginTop: "1rem", width: "100%", justifyContent: "center" }}>
-              <button onClick={toggleTorch} className="btn-outline" style={{ fontSize: "12px", gap: "6px", display: "flex", alignItems: "center", color: torchOn ? "#ffb700" : "inherit" }}>
+            <div style={{ display: "flex", gap: "10px", marginTop: "0.6rem", width: "100%", justifyContent: "center" }}>
+              <button onClick={toggleTorch} className="btn-outline" style={{ fontSize: "12px", padding: "0.4rem 0.8rem", gap: "6px", display: "flex", alignItems: "center", color: torchOn ? "#ffb700" : "inherit" }}>
                 <Zap size={14} /> {torchOn ? "Desligar Flash" : "Ligar Flash"}
               </button>
             </div>
