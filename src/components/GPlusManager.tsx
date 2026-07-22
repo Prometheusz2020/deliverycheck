@@ -579,7 +579,7 @@ export default function GPlusManager({ session }: GPlusManagerProps) {
     });
   };
 
-  const fileToCompressedBase64 = (file: File, maxWidth: number = 1200, quality: number = 0.8): Promise<string> => {
+  const fileToCompressedBase64 = (file: File, maxWidth: number = 1800, quality: number = 0.9): Promise<string> => {
     return new Promise((resolve) => {
       const reader = new FileReader();
       reader.onload = (e) => {
@@ -920,15 +920,6 @@ export default function GPlusManager({ session }: GPlusManagerProps) {
                     className="input-premium" 
                     placeholder="Ex: 7891000123456" 
                   />
-                  <button 
-                    type="button" 
-                    onClick={startScanning} 
-                    className="btn-outline" 
-                    style={{ padding: "0 0.8rem", display: "flex", alignItems: "center", justifyContent: "center", minHeight: "44px" }}
-                    title="Escanear com a câmera ao vivo"
-                  >
-                    <Camera size={20} />
-                  </button>
                   <label 
                     className="btn-outline" 
                     style={{ padding: "0 0.8rem", display: "flex", alignItems: "center", justifyContent: "center", minHeight: "44px", cursor: "pointer" }}

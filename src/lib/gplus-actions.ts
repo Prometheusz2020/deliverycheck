@@ -244,14 +244,14 @@ export async function extractBarcodeWithAI(base64Image: string) {
   try {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
-      return { success: false, error: "GEMINI_API_KEY não configurada no servidor." };
+      return { success: false, error: "GEMINI_API_KEY não configurada no ambiente Vercel/Servidor." };
     }
 
     const matchMime = base64Image.match(/^data:(image\/\w+);base64,/);
     const mimeType = matchMime ? matchMime[1] : "image/jpeg";
     const cleanBase64 = base64Image.replace(/^data:image\/\w+;base64,/, "");
 
-    const promptText = "You are a precise barcode scanner. Look closely at this image. Extract the numeric barcode (EAN-13, EAN-8, Code-128, UPC, QR Code) or the numbers printed directly under the barcode vertical lines. Return ONLY the numeric digits of the code with no spaces or text. If no barcode digits are found, return NONE.";
+    const promptText = "Analyze this image very carefully. Your job is to extract the barcode digits (EAN-13, EAN-8, UPC, Code 128, QR Code, or any numerical code printed under or near the barcode lines). Read the numbers written at the bottom or top of the barcode lines. Return ONLY the raw numeric digits with no spaces, letters, or explanation. If no barcode digits are visible, return NONE.";
 
     const buildPayload = () => ({
       method: "POST",
@@ -273,35 +273,54 @@ export async function extractBarcodeWithAI(base64Image: string) {
       })
     });
 
-    let response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`,
-      buildPayload()
-    );
+    // Try primary, secondary, and tertiary valid Gemini Vision models
+    const modelsToTry = [
+      "gemini-1.5-flash",
+      "gemini-2.0-flash",
+      "gemini-1.5-pro",
+      "gemini-flash-latest"
+    ];
 
-    if (!response.ok) {
-      response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-        buildPayload()
-      );
+    let response: Response | null = null;
+    let lastError = "";
+
+    for (const model of modelsToTry) {
+      try {
+        const res = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+          buildPayload()
+        );
+        if (res.ok) {
+          response = res;
+          break;
+        } else {
+          lastError = `Modelo ${model}: HTTP ${res.status}`;
+        }
+      } catch (err: any) {
+        lastError = err.message || "Erro de rede";
+      }
     }
 
-    if (!response.ok) {
-      const errText = await response.text();
-      console.error("Gemini API Error Response:", errText);
-      return { success: false, error: `Falha na API Gemini (${response.status})` };
+    if (!response || !response.ok) {
+      console.error("Gemini API Error Response:", lastError);
+      return { success: false, error: `Falha na API Gemini (${lastError || "Sem resposta"})` };
     }
 
     const data = await response.json();
     const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
 
-    const digitMatch = rawText.match(/\d{8,14}/) || rawText.match(/\d{4,14}/) || rawText.match(/\d+/);
-    const cleanDigits = digitMatch ? digitMatch[0] : "";
-
-    if (cleanDigits && cleanDigits.toUpperCase() !== "NONE") {
-      return { success: true, barcode: cleanDigits };
+    if (!rawText || rawText.toUpperCase().includes("NONE")) {
+      return { success: false, error: "Código de barras não identificado na foto." };
     }
 
-    return { success: false, error: "Código de barras não identificado na foto." };
+    // Clean all non-digit characters (spaces, hyphens, text)
+    const digitsOnly = rawText.replace(/[^0-9]/g, "");
+
+    if (digitsOnly && digitsOnly.length >= 4) {
+      return { success: true, barcode: digitsOnly };
+    }
+
+    return { success: false, error: "Código de barras não identificado claramente na foto." };
   } catch (error: any) {
     console.error("Error in extractBarcodeWithAI:", error);
     return { success: false, error: error.message || "Erro no serviço de IA." };
