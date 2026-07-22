@@ -400,11 +400,28 @@ export default function GPlusManager() {
     });
   };
 
-  const fileToBase64 = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
+  const fileToCompressedBase64 = (file: File, maxWidth: number = 1200, quality: number = 0.8): Promise<string> => {
+    return new Promise((resolve) => {
       const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = reject;
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          const scale = Math.min(1, maxWidth / img.width);
+          canvas.width = Math.floor(img.width * scale);
+          canvas.height = Math.floor(img.height * scale);
+
+          const ctx = canvas.getContext("2d");
+          if (!ctx) return resolve(e.target?.result as string);
+
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          const compressedDataUrl = canvas.toDataURL("image/jpeg", quality);
+          resolve(compressedDataUrl);
+        };
+        img.onerror = () => resolve(e.target?.result as string);
+        img.src = e.target?.result as string;
+      };
+      reader.onerror = () => resolve("");
       reader.readAsDataURL(file);
     });
   };
@@ -420,10 +437,12 @@ export default function GPlusManager() {
 
       // Pass 1: AI Vision Gemini API (highest accuracy for smartphone photos)
       try {
-        const base64 = await fileToBase64(file);
+        const base64 = await fileToCompressedBase64(file);
         const aiRes = await extractBarcodeWithAI(base64);
         if (aiRes.success && aiRes.barcode) {
           decodedText = aiRes.barcode;
+        } else if (aiRes.error) {
+          console.warn("AI Vision notice:", aiRes.error);
         }
       } catch (err) {
         console.error("AI Vision extraction error:", err);

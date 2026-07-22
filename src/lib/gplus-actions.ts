@@ -128,72 +128,56 @@ export async function extractBarcodeWithAI(base64Image: string) {
   try {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
-      return { success: false, error: "GEMINI_API_KEY não configurada." };
+      return { success: false, error: "GEMINI_API_KEY não configurada no servidor." };
     }
 
+    const matchMime = base64Image.match(/^data:(image\/\w+);base64,/);
+    const mimeType = matchMime ? matchMime[1] : "image/jpeg";
     const cleanBase64 = base64Image.replace(/^data:image\/\w+;base64,/, "");
+
+    const promptText = "You are a precise barcode scanner. Look closely at this image. Extract the numeric barcode (EAN-13, EAN-8, Code-128, UPC, QR Code) or the numbers printed directly under the barcode vertical lines. Return ONLY the numeric digits of the code with no spaces or text. If no barcode digits are found, return NONE.";
+
+    const buildPayload = () => ({
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [
+              { text: promptText },
+              {
+                inlineData: {
+                  mimeType: mimeType,
+                  data: cleanBase64
+                }
+              }
+            ]
+          }
+        ]
+      })
+    });
 
     let response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [
-                {
-                  text: "You are a precise barcode scanner. Extract the numeric barcode (EAN-13, EAN-8, Code-128, UPC) or QR code from this image. Look closely at the numbers printed directly under the barcode lines if present. Return ONLY the digits or code string with no extra text or spaces. If no barcode digits are visible, return NONE."
-                },
-                {
-                  inlineData: {
-                    mimeType: "image/jpeg",
-                    data: cleanBase64
-                  }
-                }
-              ]
-            }
-          ]
-        })
-      }
+      buildPayload()
     );
 
     if (!response.ok) {
-      // Fallback to gemini-2.5-flash
       response = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [
-              {
-                parts: [
-                  {
-                    text: "You are a precise barcode scanner. Extract the numeric barcode (EAN-13, EAN-8, Code-128, UPC) or QR code from this image. Look closely at the numbers printed directly under the barcode lines if present. Return ONLY the digits or code string with no extra text or spaces. If no barcode digits are visible, return NONE."
-                  },
-                  {
-                    inlineData: {
-                      mimeType: "image/jpeg",
-                      data: cleanBase64
-                    }
-                  }
-                ]
-              }
-            ]
-          })
-        }
+        buildPayload()
       );
     }
 
     if (!response.ok) {
-      return { success: false, error: "Falha na requisição da API Gemini." };
+      const errText = await response.text();
+      console.error("Gemini API Error Response:", errText);
+      return { success: false, error: `Falha na API Gemini (${response.status})` };
     }
 
     const data = await response.json();
     const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
 
-    // Extract barcode digits (prefer 8 to 14 digit sequence typical of EAN-13, EAN-8, UPC, or any digit group)
     const digitMatch = rawText.match(/\d{8,14}/) || rawText.match(/\d{4,14}/) || rawText.match(/\d+/);
     const cleanDigits = digitMatch ? digitMatch[0] : "";
 
@@ -201,9 +185,9 @@ export async function extractBarcodeWithAI(base64Image: string) {
       return { success: true, barcode: cleanDigits };
     }
 
-    return { success: false, error: "Código de barras não identificado pela IA na foto." };
-  } catch (error) {
+    return { success: false, error: "Código de barras não identificado na foto." };
+  } catch (error: any) {
     console.error("Error in extractBarcodeWithAI:", error);
-    return { success: false, error: "Erro no serviço de IA." };
+    return { success: false, error: error.message || "Erro no serviço de IA." };
   }
 }
