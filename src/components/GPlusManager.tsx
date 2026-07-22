@@ -58,13 +58,138 @@ export default function GPlusManager({ session }: GPlusManagerProps) {
   const autocompleteRef = useRef<HTMLDivElement>(null);
   const codigoInputRef = useRef<HTMLInputElement>(null);
 
-  // Camera scanner states
+  // Camera scanner states & refs
   const [isScanning, setIsScanning] = useState(false);
-  const [cameras, setCameras] = useState<any[]>([]);
-  const [activeCameraId, setActiveCameraId] = useState<string>("");
   const [torchOn, setTorchOn] = useState(false);
-  const html5QrCodeRef = useRef<any>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const liveVideoRef = useRef<HTMLVideoElement | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const scanIntervalRef = useRef<any>(null);
+
+  const startScanning = async () => {
+    setIsScanning(true);
+    setTorchOn(false);
+
+    try {
+      if (typeof navigator === "undefined" || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        showNotification("error", "Seu navegador não suporta câmera ao vivo.");
+        setIsScanning(false);
+        return;
+      }
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: { ideal: "environment" },
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        }
+      });
+
+      mediaStreamRef.current = stream;
+
+      setTimeout(() => {
+        if (liveVideoRef.current) {
+          liveVideoRef.current.srcObject = stream;
+          liveVideoRef.current.play().catch((e) => console.error("Video play error:", e));
+          startRealtimeScannerLoop();
+        }
+      }, 150);
+    } catch (err: any) {
+      console.error("Camera access error:", err);
+      showNotification("error", "Erro ao abrir a câmera: " + (err?.message || "Verifique se você permitiu o acesso no navegador."));
+      setIsScanning(false);
+    }
+  };
+
+  const stopScanning = () => {
+    if (scanIntervalRef.current) {
+      clearInterval(scanIntervalRef.current);
+      scanIntervalRef.current = null;
+    }
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getTracks().forEach((track) => track.stop());
+      mediaStreamRef.current = null;
+    }
+    if (liveVideoRef.current) {
+      liveVideoRef.current.srcObject = null;
+    }
+    setIsScanning(false);
+    setTorchOn(false);
+  };
+
+  const toggleTorch = async () => {
+    if (!mediaStreamRef.current) return;
+    try {
+      const track = mediaStreamRef.current.getVideoTracks()[0];
+      if (track) {
+        const capabilities: any = track.getCapabilities ? track.getCapabilities() : {};
+        if (capabilities.torch) {
+          const nextState = !torchOn;
+          await track.applyConstraints({
+            advanced: [{ torch: nextState }] as any
+          });
+          setTorchOn(nextState);
+        } else {
+          showNotification("error", "Flash não suportado nesta câmera.");
+        }
+      }
+    } catch (e) {
+      console.error("Torch error:", e);
+      showNotification("error", "Flash não suportado neste dispositivo.");
+    }
+  };
+
+  const startRealtimeScannerLoop = () => {
+    if (scanIntervalRef.current) clearInterval(scanIntervalRef.current);
+
+    let isFrameBusy = false;
+
+    scanIntervalRef.current = setInterval(async () => {
+      if (isFrameBusy || !liveVideoRef.current || liveVideoRef.current.readyState < 2) return;
+
+      isFrameBusy = true;
+      try {
+        const videoEl = liveVideoRef.current;
+
+        // 1. Native Browser BarcodeDetector directly on live video element
+        if (typeof window !== "undefined" && "BarcodeDetector" in window) {
+          try {
+            const barcodeDetector = new (window as any).BarcodeDetector({
+              formats: ["ean_13", "ean_8", "code_128", "code_39", "upc_a", "upc_e", "qr_code", "itf"]
+            });
+            const detected = await barcodeDetector.detect(videoEl);
+            if (detected && detected.length > 0 && detected[0].rawValue) {
+              const code = detected[0].rawValue;
+              handleScanSuccess(code);
+              return;
+            }
+          } catch (err) {}
+        }
+
+        // 2. Capture canvas frame snapshot & scan with local ZXing
+        const canvas = document.createElement("canvas");
+        canvas.width = videoEl.videoWidth || 640;
+        canvas.height = videoEl.videoHeight || 480;
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
+          canvas.toBlob(async (blob) => {
+            if (blob) {
+              const file = new File([blob], "frame.png", { type: "image/png" });
+              const code = await detectBarcodeLocally(file);
+              if (code) {
+                handleScanSuccess(code);
+              }
+            }
+          }, "image/png");
+        }
+      } catch (err) {
+        console.error("Frame scan error:", err);
+      } finally {
+        isFrameBusy = false;
+      }
+    }, 150);
+  };
 
 
 
@@ -366,15 +491,6 @@ export default function GPlusManager({ session }: GPlusManagerProps) {
     showNotification("success", "Lista de produtos exportada com sucesso!");
   };
 
-  // Cleanup camera on unmount
-  useEffect(() => {
-    return () => {
-      if (html5QrCodeRef.current) {
-        html5QrCodeRef.current.stop().catch(console.error);
-      }
-    };
-  }, []);
-
   // Web Audio synthetic beep
   const playBeep = () => {
     try {
@@ -391,158 +507,6 @@ export default function GPlusManager({ session }: GPlusManagerProps) {
     } catch (e) {
       console.error(e);
     }
-  };
-
-  const startScanning = async () => {
-    setIsScanning(true);
-    setCameras([]);
-    setTorchOn(false);
-
-    try {
-      // Prompt camera permissions explicitly on user click (required for iOS Safari and Android Chrome)
-      if (typeof navigator !== "undefined" && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        try {
-          const stream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: { ideal: "environment" } }
-          });
-          // Stop stream tracks so Html5Qrcode can bind to the device
-          stream.getTracks().forEach((track) => track.stop());
-        } catch (permErr) {
-          console.warn("getUserMedia permission prompt notice:", permErr);
-        }
-      }
-
-      // Allow DOM to render the scanner container
-      setTimeout(async () => {
-        try {
-          const { Html5Qrcode, Html5QrcodeSupportedFormats } = await import("html5-qrcode");
-
-          const formatsToSupport = [
-            Html5QrcodeSupportedFormats.EAN_13,
-            Html5QrcodeSupportedFormats.EAN_8,
-            Html5QrcodeSupportedFormats.CODE_128,
-            Html5QrcodeSupportedFormats.CODE_39,
-            Html5QrcodeSupportedFormats.UPC_A,
-            Html5QrcodeSupportedFormats.UPC_E,
-            Html5QrcodeSupportedFormats.QR_CODE,
-            Html5QrcodeSupportedFormats.ITF,
-          ];
-
-          const html5QrCode = new Html5Qrcode("scanner-preview", {
-            formatsToSupport,
-            verbose: false,
-          });
-          html5QrCodeRef.current = html5QrCode;
-
-          const devices = await Html5Qrcode.getCameras();
-          if (devices && devices.length > 0) {
-            setCameras(devices);
-            const backCamera = devices.find((d) =>
-              d.label.toLowerCase().includes("back") ||
-              d.label.toLowerCase().includes("traseira") ||
-              d.label.toLowerCase().includes("environment") ||
-              d.label.toLowerCase().includes("rear")
-            );
-            const selectedId = backCamera ? backCamera.id : devices[devices.length - 1].id;
-            setActiveCameraId(selectedId);
-            await startCamera(html5QrCode, selectedId);
-          } else {
-            await startCameraWithFacingMode(html5QrCode);
-          }
-        } catch (err: any) {
-          console.error("Camera access error:", err);
-          showNotification(
-            "error",
-            "Erro ao abrir a câmera: " + (err?.message || "Verifique se você permitiu o acesso à câmera no navegador.")
-          );
-          setIsScanning(false);
-        }
-      }, 300);
-    } catch (err: any) {
-      console.error("Scanning start error:", err);
-      setIsScanning(false);
-    }
-  };
-
-  const getScanConfig = () => ({
-    fps: 25,
-    qrbox: (viewfinderWidth: number, viewfinderHeight: number) => {
-      const width = Math.min(Math.floor(viewfinderWidth * 0.95), 380);
-      const height = Math.min(Math.floor(viewfinderHeight * 0.6), 220);
-      return { width: Math.max(width, 220), height: Math.max(height, 100) };
-    },
-  });
-
-  const startCamera = async (scannerInstance: any, cameraId: string) => {
-    try {
-      await scannerInstance.start(
-        cameraId,
-        getScanConfig(),
-        (decodedText: string) => {
-          handleScanSuccess(decodedText);
-        },
-        () => {} // Suppress errors in scanning loop
-      );
-    } catch (err) {
-      console.error("Camera start by ID error, trying facingMode:", err);
-      await startCameraWithFacingMode(scannerInstance);
-    }
-  };
-
-  const startCameraWithFacingMode = async (scannerInstance: any) => {
-    try {
-      await scannerInstance.start(
-        { facingMode: "environment" },
-        getScanConfig(),
-        (decodedText: string) => {
-          handleScanSuccess(decodedText);
-        },
-        () => {}
-      );
-    } catch (err) {
-      console.error("Camera facingMode error:", err);
-      throw err;
-    }
-  };
-
-  const switchCamera = async (cameraId: string) => {
-    if (!html5QrCodeRef.current) return;
-    try {
-      setTorchOn(false);
-      await html5QrCodeRef.current.stop();
-      setActiveCameraId(cameraId);
-      await startCamera(html5QrCodeRef.current, cameraId);
-    } catch (err) {
-      console.error("Error switching camera:", err);
-      showNotification("error", "Erro ao mudar de câmera.");
-    }
-  };
-
-  const toggleTorch = async () => {
-    if (!html5QrCodeRef.current) return;
-    try {
-      const newState = !torchOn;
-      await html5QrCodeRef.current.applyVideoConstraints({
-        advanced: [{ torch: newState }]
-      });
-      setTorchOn(newState);
-    } catch (e) {
-      console.error("Torch error:", e);
-      showNotification("error", "Flash não suportado neste dispositivo.");
-    }
-  };
-
-  const stopScanning = async () => {
-    if (html5QrCodeRef.current) {
-      try {
-        setTorchOn(false);
-        await html5QrCodeRef.current.stop();
-      } catch (err) {
-        console.error("Error stopping camera:", err);
-      }
-      html5QrCodeRef.current = null;
-    }
-    setIsScanning(false);
   };
 
   const tryLookupOnline = async (barcode: string) => {
@@ -792,13 +756,13 @@ export default function GPlusManager({ session }: GPlusManagerProps) {
         </div>
       )}
 
-      {/* Live Camera Scanner Modal */}
+      {/* Real-Time Live Camera Scanner Modal */}
       {isScanning && (
         <div style={{
           position: "fixed",
           inset: 0,
           zIndex: 99999,
-          background: "rgba(0, 0, 0, 0.92)",
+          background: "rgba(0, 0, 0, 0.94)",
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
@@ -808,33 +772,52 @@ export default function GPlusManager({ session }: GPlusManagerProps) {
           <div style={{
             position: "relative",
             width: "100%",
-            maxWidth: "500px",
+            maxWidth: "460px",
             background: "var(--surface-mid)",
             border: "1px solid var(--glass-border)",
-            borderRadius: "16px",
+            borderRadius: "20px",
             overflow: "hidden",
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
-            padding: "1.2rem"
+            padding: "1.2rem",
+            boxShadow: "0 20px 50px rgba(0,0,0,0.8)"
           }}>
             <div style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
               <span style={{ fontWeight: 700, fontSize: "14px", color: "var(--primary)", display: "flex", alignItems: "center", gap: "6px" }}>
-                <Camera size={18} /> CÂMERA AO VIVO
+                <Camera size={18} /> CÂMERA AO VIVO (TEMPO REAL)
               </span>
               <button onClick={stopScanning} className="btn-outline" style={{ padding: "0.4rem 0.8rem", fontSize: "12px", gap: "4px", display: "flex", alignItems: "center" }}>
                 <X size={16} /> Fechar
               </button>
             </div>
 
-            <div id="scanner-preview" style={{ width: "100%", borderRadius: "12px", overflow: "hidden", minHeight: "280px", background: "#000" }}></div>
+            {/* Direct Native Video Stream - Bound directly to getUserMedia stream */}
+            <div style={{ position: "relative", width: "100%", height: "290px", borderRadius: "12px", overflow: "hidden", background: "#000" }}>
+              <video
+                ref={liveVideoRef}
+                autoPlay
+                playsInline
+                muted
+                style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "12px" }}
+              />
+              {/* Laser scanning line overlay */}
+              <div style={{
+                position: "absolute",
+                top: "50%",
+                left: "5%",
+                right: "5%",
+                height: "2px",
+                background: "var(--primary)",
+                boxShadow: "0 0 12px var(--primary)"
+              }}></div>
+            </div>
+
+            <p style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "0.8rem", textAlign: "center" }}>
+              Aponte a câmera para o código de barras do produto
+            </p>
 
             <div style={{ display: "flex", gap: "10px", marginTop: "1rem", width: "100%", justifyContent: "center" }}>
-              {cameras.length > 1 && (
-                <button onClick={() => switchCamera(cameras.find(c => c.id !== activeCameraId)?.id || cameras[0].id)} className="btn-outline" style={{ fontSize: "12px", gap: "6px", display: "flex", alignItems: "center" }}>
-                  <RefreshCw size={14} /> Trocar Câmera
-                </button>
-              )}
               <button onClick={toggleTorch} className="btn-outline" style={{ fontSize: "12px", gap: "6px", display: "flex", alignItems: "center", color: torchOn ? "#ffb700" : "inherit" }}>
                 <Zap size={14} /> {torchOn ? "Desligar Flash" : "Ligar Flash"}
               </button>
@@ -1029,29 +1012,25 @@ export default function GPlusManager({ session }: GPlusManagerProps) {
                     className="input-premium" 
                     placeholder="Ex: 7891000123456" 
                   />
-                  <label 
+                  <button 
+                    type="button" 
+                    onClick={startScanning} 
                     className="btn-outline" 
-                    style={{ padding: "0 0.8rem", display: "flex", alignItems: "center", justifyContent: "center", minHeight: "44px", cursor: "pointer" }}
-                    title="Tirar foto do código de barras usando a câmera do celular"
+                    style={{ padding: "0 0.8rem", display: "flex", alignItems: "center", justifyContent: "center", minHeight: "44px" }}
+                    title="Escanear com a câmera ao vivo (Tempo Real)"
                   >
                     <Camera size={20} />
-                    <input 
-                      type="file" 
-                      accept="image/*" 
-                      capture="environment" 
-                      onChange={handleScanImageFile} 
-                      style={{ display: "none" }} 
-                    />
-                  </label>
+                  </button>
                   <label 
                     className="btn-outline" 
                     style={{ padding: "0 0.8rem", display: "flex", alignItems: "center", justifyContent: "center", minHeight: "44px", cursor: "pointer" }}
-                    title="Selecionar foto da galeria"
+                    title="Tirar foto ou selecionar imagem da galeria"
                   >
                     <Upload size={20} />
                     <input 
                       type="file" 
                       accept="image/*" 
+                      capture="environment" 
                       onChange={handleScanImageFile} 
                       style={{ display: "none" }} 
                     />
@@ -1295,130 +1274,7 @@ export default function GPlusManager({ session }: GPlusManagerProps) {
 
       </div>
 
-      {/* Scanner Overlay Modal */}
-      {isScanning && (
-        <div style={{
-          position: "fixed",
-          top: 0, left: 0, width: "100vw", height: "100vh",
-          background: "rgba(2, 2, 8, 0.95)",
-          backdropFilter: "blur(20px)",
-          WebkitBackdropFilter: "blur(20px)",
-          zIndex: 100000,
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          padding: "1.5rem"
-        }}>
-          <div className="card-premium animate-entrance" style={{ width: "100%", maxWidth: "500px", position: "relative", border: "1px solid rgba(0, 242, 255, 0.3)" }}>
-            {/* Header */}
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
-              <h4 style={{ color: "var(--primary)", display: "flex", alignItems: "center", gap: "8px" }}>
-                <Camera size={18} /> Scanner de Código de Barras
-              </h4>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginLeft: "auto" }}>
-                <button
-                  type="button"
-                  onClick={toggleTorch}
-                  className="btn-outline"
-                  style={{
-                    padding: "0.4rem 0.8rem",
-                    fontSize: "12px",
-                    borderColor: torchOn ? "var(--warning)" : "rgba(255,255,255,0.1)",
-                    color: torchOn ? "var(--warning)" : "var(--text-secondary)"
-                  }}
-                  title="Alternar Flash"
-                >
-                  <Zap size={14} /> {torchOn ? "Flash ON" : "Flash"}
-                </button>
-                <button 
-                  type="button"
-                  onClick={stopScanning}
-                  style={{ background: "transparent", border: "none", color: "var(--text-secondary)", cursor: "pointer", padding: "0.2rem" }}
-                >
-                  <X size={20} />
-                </button>
-              </div>
-            </div>
 
-            {/* Camera selection dropdown */}
-            {cameras.length > 1 && (
-              <select 
-                value={activeCameraId} 
-                onChange={(e) => switchCamera(e.target.value)}
-                className="input-premium"
-                style={{ marginBottom: "1rem", fontSize: "12px", padding: "0.5rem" }}
-              >
-                {cameras.map((cam) => (
-                  <option key={cam.id} value={cam.id}>{cam.label || `Câmera ${cam.id}`}</option>
-                ))}
-              </select>
-            )}
-
-            {/* Video Container */}
-            <div style={{ 
-              width: "100%", 
-              overflow: "hidden", 
-              borderRadius: "12px", 
-              border: "1px solid var(--glass-border)",
-              background: "#000",
-              aspectRatio: "4/3",
-              position: "relative"
-            }}>
-              <div id="scanner-preview" style={{ width: "100%", height: "100%" }}></div>
-              
-              {/* Scan box overlay */}
-              <div style={{
-                position: "absolute",
-                top: "50%", left: "50%",
-                transform: "translate(-50%, -50%)",
-                width: "85%", height: "45%",
-                border: "2px dashed var(--primary)",
-                borderRadius: "10px",
-                boxShadow: "0 0 25px rgba(0, 242, 255, 0.4)",
-                pointerEvents: "none",
-                zIndex: 10
-              }}>
-                <div style={{
-                  position: "absolute",
-                  top: 0, left: 0, width: "100%", height: "3px",
-                  background: "linear-gradient(90deg, transparent, var(--primary), transparent)",
-                  boxShadow: "0 0 12px var(--primary)",
-                  animation: "laser 1.8s ease-in-out infinite"
-                }}></div>
-              </div>
-            </div>
-
-            <p style={{ color: "var(--text-secondary)", fontSize: "12px", textAlign: "center", marginTop: "1rem", fontWeight: 600 }}>
-              Aponte a câmera diretamente para o código de barras EAN / QR Code.
-            </p>
-
-            <div style={{ display: "flex", gap: "10px", marginTop: "1rem" }}>
-              <label 
-                className="btn-outline" 
-                style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", cursor: "pointer", padding: "0.8rem", fontSize: "12px" }}
-              >
-                <Upload size={16} /> Tirar Foto / Imagem
-                <input 
-                  type="file" 
-                  accept="image/*" 
-                  capture="environment" 
-                  onChange={handleScanImageFile} 
-                  style={{ display: "none" }} 
-                />
-              </label>
-              <button 
-                type="button"
-                onClick={stopScanning} 
-                className="btn-outline" 
-                style={{ flex: 1, padding: "0.8rem" }}
-              >
-                Cancelar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Hidden container for temp file scanner */}
       <div id="temp-file-scanner" style={{ display: "none" }}></div>
