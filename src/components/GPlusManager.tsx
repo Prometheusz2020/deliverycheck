@@ -613,6 +613,7 @@ export default function GPlusManager({ session }: GPlusManagerProps) {
       showNotification("success", "🤖 IA Gemini lendo foto do código de barras...");
       
       let decodedText: string | null = null;
+      let aiErrorText: string | null = null;
 
       // Pass 1: AI Vision Gemini API (highest accuracy for smartphone photos)
       try {
@@ -621,10 +622,12 @@ export default function GPlusManager({ session }: GPlusManagerProps) {
         if (aiRes.success && aiRes.barcode) {
           decodedText = aiRes.barcode;
         } else if (aiRes.error) {
+          aiErrorText = aiRes.error;
           console.warn("AI Vision notice:", aiRes.error);
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error("AI Vision extraction error:", err);
+        aiErrorText = err.message || "Erro de conexão com o serviço de IA";
       }
 
       // Pass 2: Local ZXing Canvas Multi-Scale Scanner (Fallback if AI key is missing or missed it)
@@ -681,7 +684,7 @@ export default function GPlusManager({ session }: GPlusManagerProps) {
           stopScanning();
         }
       } else {
-        showNotification("error", "Não foi possível identificar o código na foto. Certifique-se de que os números abaixo do código estejam visíveis.");
+        showNotification("error", aiErrorText ? `🤖 IA: ${aiErrorText}` : "Não foi possível identificar o código na foto. Certifique-se de que a imagem esteja nítida.");
       }
     } catch (err: any) {
       console.error("Image file scan error:", err);
