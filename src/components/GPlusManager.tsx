@@ -11,7 +11,6 @@ import {
   getGPlusProducts, 
   createOrUpdateProduct, 
   deleteProduct, 
-  extractBarcodeWithAI,
   lookupBarcodeOnline,
   logoutGPlusUser,
   GPlusProductInput 
@@ -447,13 +446,12 @@ export default function GPlusManager({ session }: GPlusManagerProps) {
   };
 
   const getScanConfig = () => ({
-    fps: 15,
+    fps: 25,
     qrbox: (viewfinderWidth: number, viewfinderHeight: number) => {
-      const width = Math.min(Math.floor(viewfinderWidth * 0.9), 350);
-      const height = Math.min(Math.floor(viewfinderHeight * 0.5), 180);
+      const width = Math.min(Math.floor(viewfinderWidth * 0.95), 380);
+      const height = Math.min(Math.floor(viewfinderHeight * 0.6), 220);
       return { width: Math.max(width, 220), height: Math.max(height, 100) };
     },
-    aspectRatio: 1.333333,
   });
 
   const startCamera = async (scannerInstance: any, cameraId: string) => {
@@ -708,33 +706,7 @@ export default function GPlusManager({ session }: GPlusManagerProps) {
     try {
       showNotification("success", "🔍 Lendo código de barras da foto...");
       
-      let decodedText: string | null = null;
-      let aiErrorText: string | null = null;
-
-      // PASS 1: 100% Local Device Hardware Scanner (Fast, Free, No AI, Instant)
-      decodedText = await detectBarcodeLocally(file);
-
-      // PASS 2: If local hardware scan missed it, try Gemini AI Vision as fallback
-      if (!decodedText) {
-        try {
-          const base64 = await fileToCompressedBase64(file);
-          const response = await fetch("/api/extract-barcode", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ base64Image: base64 }),
-          });
-          const aiRes = await response.json();
-          if (aiRes.success && aiRes.barcode) {
-            decodedText = aiRes.barcode;
-          } else if (aiRes.error) {
-            aiErrorText = aiRes.error;
-            console.warn("AI Vision notice:", aiRes.error);
-          }
-        } catch (err: any) {
-          console.error("AI Vision extraction error:", err);
-          aiErrorText = err.message || "Erro de conexão com o serviço de IA";
-        }
-      }
+      const decodedText = await detectBarcodeLocally(file);
 
       if (decodedText) {
         playBeep();
@@ -747,9 +719,7 @@ export default function GPlusManager({ session }: GPlusManagerProps) {
       } else {
         showNotification(
           "error",
-          aiErrorText 
-            ? `Leitura falhou: ${aiErrorText}` 
-            : "Não foi possível identificar o código na foto. Certifique-se de que as barras verticais e números estejam visíveis."
+          "Não foi possível ler o código na foto. Posicione o código no centro ou use a câmera ao vivo."
         );
       }
     } catch (err: any) {
