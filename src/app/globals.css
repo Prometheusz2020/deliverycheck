@@ -325,3 +325,38 @@ h1, h2, h3, h4 {
   }
 }
 
+/* Mobile Full Screen & Touch Optimizations */
+@media (max-width: 640px) {
+  html, body {
+    width: 100%;
+    overflow-x: hidden;
+  }
+  
+  .page-container {
+    padding: 0.5rem 0.25rem;
+    gap: 1rem;
+    width: 100%;
+  }
+
+  .card-premium {
+    padding: 1rem 0.75rem;
+    border-radius: 12px;
+  }
+
+  .input-premium {
+    font-size: 16px; /* Prevents auto-zoom on mobile iOS safari */
+    padding: 0.8rem 0.75rem;
+  }
+
+  /* Table responsiveness on mobile */
+  .table-wrapper {
+    -webkit-overflow-scrolling: touch;
+    border-radius: 8px;
+  }
+
+  .table-premium th, .table-premium td {
+    padding: 0.8rem 0.5rem;
+    font-size: 12px;
+  }
+}
+

@@ -4,7 +4,8 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import { 
   Plus, Edit, Trash2, Search, FileText, 
   CheckCircle2, AlertCircle, X, ChevronLeft, ChevronRight, 
-  Loader2, ArrowLeft, RefreshCw, Camera, Download, Zap, Upload
+  Loader2, ArrowLeft, RefreshCw, Camera, Download, Zap, Upload,
+  Copy
 } from "lucide-react";
 import { 
   getGPlusProducts, 
@@ -38,6 +39,12 @@ export default function GPlusManager() {
   const [formGrupo, setFormGrupo] = useState("");
   const [formValor, setFormValor] = useState("");
   const [formCodigo, setFormCodigo] = useState("");
+
+  // Autocomplete states & refs
+  const [suggestions, setSuggestions] = useState<Product[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(-1);
+  const autocompleteRef = useRef<HTMLDivElement>(null);
 
   // Camera scanner states
   const [isScanning, setIsScanning] = useState(false);
@@ -74,6 +81,113 @@ export default function GPlusManager() {
   useEffect(() => {
     fetchProducts();
   }, [fetchProducts]);
+
+  // Autocomplete outside click handler
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (autocompleteRef.current && !autocompleteRef.current.contains(event.target as Node)) {
+        setShowSuggestions(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  // Autocomplete data fetching (with debounce)
+  useEffect(() => {
+    if (formNome.trim().length < 2) {
+      setSuggestions([]);
+      return;
+    }
+
+    const delayDebounceFn = setTimeout(async () => {
+      try {
+        const res = await getGPlusProducts(formNome);
+        if (res.success && res.products) {
+          // Filter out the current product being edited
+          const filtered = (res.products as Product[]).filter(p => p.id !== formId);
+          setSuggestions(filtered.slice(0, 8));
+        }
+      } catch (err) {
+        console.error("Erro ao buscar sugestões:", err);
+      }
+    }, 300);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [formNome, formId]);
+
+  const handleSelectSuggestion = (suggestion: Product) => {
+    setFormId(suggestion.id);
+    setFormNome(suggestion.nome);
+    setFormGrupo(suggestion.grupo || "");
+    setFormValor(suggestion.valor.toString());
+    setFormCodigo(suggestion.codigoDeBarras || "");
+    setShowSuggestions(false);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!showSuggestions || suggestions.length === 0) return;
+
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setActiveSuggestionIndex(prev => 
+        prev < suggestions.length - 1 ? prev + 1 : 0
+      );
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setActiveSuggestionIndex(prev => 
+        prev > 0 ? prev - 1 : suggestions.length - 1
+      );
+    } else if (e.key === "Enter") {
+      if (activeSuggestionIndex >= 0 && activeSuggestionIndex < suggestions.length) {
+        e.preventDefault();
+        handleSelectSuggestion(suggestions[activeSuggestionIndex]);
+      }
+    } else if (e.key === "Escape") {
+      setShowSuggestions(false);
+    }
+  };
+
+  // Submit Form as New Product (cloning/duplicating)
+  const handleSaveAsNew = async (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    if (!formNome.trim()) {
+      showNotification("error", "O nome do produto é obrigatório.");
+      return;
+    }
+
+    const valorNum = parseFloat(formValor.replace(",", ".")) || 0;
+    if (valorNum < 0) {
+      showNotification("error", "O valor não pode ser negativo.");
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const res = await createOrUpdateProduct({
+        id: undefined, // Clear ID to force creation of a new product
+        nome: formNome,
+        grupo: formGrupo || null,
+        valor: valorNum,
+        codigoDeBarras: formCodigo || null,
+      });
+
+      if (res.success) {
+        showNotification("success", "Produto cadastrado como novo com sucesso!");
+        resetForm();
+        fetchProducts();
+      } else {
+        showNotification("error", res.error || "Erro ao salvar produto.");
+      }
+    } catch (err) {
+      console.error(err);
+      showNotification("error", "Erro de rede ao salvar produto.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   // Helper for notification
   const showNotification = (type: "success" | "error", message: string) => {
@@ -597,18 +711,85 @@ export default function GPlusManager() {
             </h3>
             
             <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "1.2rem" }}>
-              <div>
+              <div ref={autocompleteRef} style={{ position: "relative" }}>
                 <label style={{ fontSize: "11px", color: "var(--text-secondary)", fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: "6px" }}>
                   Nome do Produto <span style={{ color: "var(--danger)" }}>*</span>
                 </label>
-                <input 
-                  type="text" 
-                  value={formNome} 
-                  onChange={e => setFormNome(e.target.value)} 
-                  className="input-premium" 
-                  placeholder="Ex: Coca-Cola Lata 350ml" 
-                  required
-                />
+                <div style={{ position: "relative" }}>
+                  <input 
+                    type="text" 
+                    value={formNome} 
+                    onChange={e => {
+                      setFormNome(e.target.value);
+                      setShowSuggestions(true);
+                      setActiveSuggestionIndex(-1);
+                    }} 
+                    onFocus={() => setShowSuggestions(true)}
+                    onKeyDown={handleKeyDown}
+                    className="input-premium" 
+                    placeholder="Ex: Coca-Cola Lata 350ml" 
+                    required
+                  />
+                  
+                  {/* Autocomplete Dropdown */}
+                  {showSuggestions && suggestions.length > 0 && (
+                    <div style={{
+                      position: "absolute",
+                      top: "100%",
+                      left: 0,
+                      right: 0,
+                      zIndex: 1000,
+                      background: "var(--glass)",
+                      backdropFilter: "blur(20px)",
+                      WebkitBackdropFilter: "blur(20px)",
+                      border: "1px solid var(--glass-border)",
+                      borderRadius: "8px",
+                      marginTop: "4px",
+                      boxShadow: "0 10px 25px rgba(0, 0, 0, 0.5)",
+                      maxHeight: "260px",
+                      overflowY: "auto"
+                    }}>
+                      {suggestions.map((suggestion, index) => (
+                        <div 
+                          key={suggestion.id}
+                          onClick={() => handleSelectSuggestion(suggestion)}
+                          onMouseEnter={() => setActiveSuggestionIndex(index)}
+                          style={{
+                            padding: "0.8rem 1rem",
+                            cursor: "pointer",
+                            background: index === activeSuggestionIndex ? "rgba(0, 242, 255, 0.15)" : "transparent",
+                            borderBottom: index < suggestions.length - 1 ? "1px solid rgba(255, 255, 255, 0.05)" : "none",
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            transition: "background 0.2s"
+                          }}
+                        >
+                          <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+                            <span style={{ fontWeight: 600, fontSize: "14px", color: "#fff" }}>
+                              {suggestion.nome}
+                            </span>
+                            {suggestion.grupo && (
+                              <span style={{ fontSize: "10px", color: "var(--text-secondary)", textTransform: "uppercase" }}>
+                                {suggestion.grupo}
+                              </span>
+                            )}
+                          </div>
+                          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "2px" }}>
+                            <span style={{ fontWeight: 700, color: "var(--accent)", fontSize: "13px" }}>
+                              R$ {suggestion.valor.toFixed(2)}
+                            </span>
+                            {suggestion.codigoDeBarras && (
+                              <span style={{ fontSize: "11px", color: "var(--text-muted)", fontFamily: "monospace" }}>
+                                📷 {suggestion.codigoDeBarras}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 {formNome.trim() && products.some(p => p.nome.trim().toLowerCase() === formNome.trim().toLowerCase() && p.id !== formId) && (
                   <span style={{ color: "var(--warning)", fontSize: "11px", marginTop: "4px", display: "block", fontWeight: 600 }}>
                     ⚠️ Já existe um produto cadastrado com este nome!
@@ -684,14 +865,26 @@ export default function GPlusManager() {
 
               <div style={{ display: "flex", gap: "10px", marginTop: "1rem" }}>
                 {formId && (
-                  <button 
-                    type="button" 
-                    onClick={resetForm} 
-                    className="btn-outline" 
-                    style={{ flex: 1, padding: "0.8rem" }}
-                  >
-                    Cancelar
-                  </button>
+                  <>
+                    <button 
+                      type="button" 
+                      onClick={resetForm} 
+                      className="btn-outline" 
+                      style={{ flex: 1, padding: "0.8rem" }}
+                    >
+                      Cancelar
+                    </button>
+                    <button 
+                      type="button"
+                      onClick={handleSaveAsNew}
+                      disabled={isSaving}
+                      className="btn-outline"
+                      style={{ flex: 1.5, padding: "0.8rem", gap: "6px", display: "flex", alignItems: "center", justifyContent: "center" }}
+                      title="Criar um novo produto usando as informações deste formulário"
+                    >
+                      <Copy size={16} /> Salvar como Novo
+                    </button>
+                  </>
                 )}
                 <button 
                   type="submit" 
