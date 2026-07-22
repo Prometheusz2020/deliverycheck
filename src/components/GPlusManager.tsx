@@ -422,27 +422,22 @@ export default function GPlusManager({ session }: GPlusManagerProps) {
         });
         html5QrCodeRef.current = html5QrCode;
 
-        const devices = await Html5Qrcode.getCameras();
-        if (devices && devices.length > 0) {
-          setCameras(devices);
-          const backCamera = devices.find(d => 
-            d.label.toLowerCase().includes("back") || 
-            d.label.toLowerCase().includes("traseira") || 
-            d.label.toLowerCase().includes("environment") || 
-            d.label.toLowerCase().includes("rear")
-          );
-          const selectedId = backCamera ? backCamera.id : devices[0].id;
-          setActiveCameraId(selectedId);
-          await startCamera(html5QrCode, selectedId);
-        } else {
-          await startCameraWithFacingMode(html5QrCode);
-        }
+        // Start back camera directly via facingMode constraint
+        await startCameraWithFacingMode(html5QrCode);
+
+        // Fetch camera list in background for switcher button
+        try {
+          const devices = await Html5Qrcode.getCameras();
+          if (devices && devices.length > 0) {
+            setCameras(devices);
+          }
+        } catch (e) {}
       } catch (err) {
         console.error("Camera access error:", err);
-        showNotification("error", "Não foi possível acessar a câmera. Verifique as permissões.");
+        showNotification("error", "Não foi possível acessar a câmera. Verifique as permissões de câmera no seu navegador.");
         setIsScanning(false);
       }
-    }, 200);
+    }, 250);
   };
 
   const getScanConfig = () => ({
