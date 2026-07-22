@@ -615,10 +615,15 @@ export default function GPlusManager({ session }: GPlusManagerProps) {
       let decodedText: string | null = null;
       let aiErrorText: string | null = null;
 
-      // Pass 1: AI Vision Gemini API (highest accuracy for smartphone photos)
+      // Pass 1: AI Vision Gemini API via dedicated route (avoids Server Action payload limits & error digests)
       try {
         const base64 = await fileToCompressedBase64(file);
-        const aiRes = await extractBarcodeWithAI(base64);
+        const response = await fetch("/api/extract-barcode", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ base64Image: base64 }),
+        });
+        const aiRes = await response.json();
         if (aiRes.success && aiRes.barcode) {
           decodedText = aiRes.barcode;
         } else if (aiRes.error) {
