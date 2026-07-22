@@ -330,3 +330,48 @@ export async function extractBarcodeWithAI(base64Image: string) {
     return { success: false, error: error.message || "Erro no serviço de IA." };
   }
 }
+
+export async function lookupBarcodeOnline(barcode: string) {
+  try {
+    const cleanBarcode = barcode.trim().replace(/[^0-9]/g, "");
+    if (!cleanBarcode || cleanBarcode.length < 8) {
+      return { success: false, error: "Código de barras muito curto." };
+    }
+
+    const response = await fetch(`https://br.openfoodfacts.org/api/v0/product/${cleanBarcode}.json`, {
+      headers: { "User-Agent": "DeliveryCheckApp/1.0" },
+      next: { revalidate: 86400 }
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      if (data.status === 1 && data.product) {
+        const p = data.product;
+        const nome = p.product_name_pt || p.product_name || p.abbreviated_product_name || "";
+        const categories = p.categories_tags || [];
+        let grupo = "";
+        if (categories.length > 0) {
+          const rawCat = categories[categories.length - 1];
+          grupo = rawCat.replace("pt:", "").replace("en:", "").replace(/-/g, " ");
+        } else if (p.brands) {
+          grupo = p.brands;
+        }
+
+        if (nome) {
+          return {
+            success: true,
+            product: {
+              nome: nome.trim(),
+              grupo: grupo ? grupo.trim().toUpperCase() : null
+            }
+          };
+        }
+      }
+    }
+
+    return { success: false, error: "Produto não localizado na base nacional de códigos de barras." };
+  } catch (error: any) {
+    console.error("Error in lookupBarcodeOnline:", error);
+    return { success: false, error: "Erro na consulta online de código de barras." };
+  }
+}

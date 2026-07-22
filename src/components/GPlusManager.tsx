@@ -12,6 +12,7 @@ import {
   createOrUpdateProduct, 
   deleteProduct, 
   extractBarcodeWithAI,
+  lookupBarcodeOnline,
   logoutGPlusUser,
   GPlusProductInput 
 } from "@/lib/gplus-actions";
@@ -527,10 +528,29 @@ export default function GPlusManager({ session }: GPlusManagerProps) {
     setIsScanning(false);
   };
 
+  const tryLookupOnline = async (barcode: string) => {
+    if (!barcode || barcode.length < 8) return;
+    try {
+      const res = await lookupBarcodeOnline(barcode);
+      if (res.success && res.product) {
+        if (!formNome.trim() && res.product.nome) {
+          setFormNome(res.product.nome);
+        }
+        if (!formGrupo.trim() && res.product.grupo) {
+          setFormGrupo(res.product.grupo);
+        }
+        showNotification("success", `✨ Produto identificado: ${res.product.nome}`);
+      }
+    } catch (e) {
+      console.error("Online lookup error:", e);
+    }
+  };
+
   const handleScanSuccess = (decodedText: string) => {
     playBeep();
     setFormCodigo(decodedText);
     showNotification("success", `Código escaneado: ${decodedText}`);
+    tryLookupOnline(decodedText);
     stopScanning();
   };
 
@@ -720,6 +740,7 @@ export default function GPlusManager({ session }: GPlusManagerProps) {
         playBeep();
         setFormCodigo(decodedText);
         showNotification("success", `📷 Código identificado: ${decodedText}`);
+        tryLookupOnline(decodedText);
         if (isScanning) {
           stopScanning();
         }
@@ -779,6 +800,57 @@ export default function GPlusManager({ session }: GPlusManagerProps) {
           >
             <X size={16} />
           </button>
+        </div>
+      )}
+
+      {/* Live Camera Scanner Modal */}
+      {isScanning && (
+        <div style={{
+          position: "fixed",
+          inset: 0,
+          zIndex: 99999,
+          background: "rgba(0, 0, 0, 0.92)",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "1rem"
+        }}>
+          <div style={{
+            position: "relative",
+            width: "100%",
+            maxWidth: "500px",
+            background: "var(--surface-mid)",
+            border: "1px solid var(--glass-border)",
+            borderRadius: "16px",
+            overflow: "hidden",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            padding: "1.2rem"
+          }}>
+            <div style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
+              <span style={{ fontWeight: 700, fontSize: "14px", color: "var(--primary)", display: "flex", alignItems: "center", gap: "6px" }}>
+                <Camera size={18} /> CÂMERA AO VIVO
+              </span>
+              <button onClick={stopScanning} className="btn-outline" style={{ padding: "0.4rem 0.8rem", fontSize: "12px", gap: "4px", display: "flex", alignItems: "center" }}>
+                <X size={16} /> Fechar
+              </button>
+            </div>
+
+            <div id="scanner-preview" style={{ width: "100%", borderRadius: "12px", overflow: "hidden", minHeight: "280px", background: "#000" }}></div>
+
+            <div style={{ display: "flex", gap: "10px", marginTop: "1rem", width: "100%", justifyContent: "center" }}>
+              {cameras.length > 1 && (
+                <button onClick={() => switchCamera(cameras.find(c => c.id !== activeCameraId)?.id || cameras[0].id)} className="btn-outline" style={{ fontSize: "12px", gap: "6px", display: "flex", alignItems: "center" }}>
+                  <RefreshCw size={14} /> Trocar Câmera
+                </button>
+              )}
+              <button onClick={toggleTorch} className="btn-outline" style={{ fontSize: "12px", gap: "6px", display: "flex", alignItems: "center", color: torchOn ? "#ffb700" : "inherit" }}>
+                <Zap size={14} /> {torchOn ? "Desligar Flash" : "Ligar Flash"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -968,6 +1040,15 @@ export default function GPlusManager({ session }: GPlusManagerProps) {
                     className="input-premium" 
                     placeholder="Ex: 7891000123456" 
                   />
+                  <button 
+                    type="button" 
+                    onClick={startScanning} 
+                    className="btn-outline" 
+                    style={{ padding: "0 0.8rem", display: "flex", alignItems: "center", justifyContent: "center", minHeight: "44px" }}
+                    title="Escanear com a câmera ao vivo (Leitura Instantânea)"
+                  >
+                    <Camera size={20} />
+                  </button>
                   <label 
                     className="btn-outline" 
                     style={{ padding: "0 0.8rem", display: "flex", alignItems: "center", justifyContent: "center", minHeight: "44px", cursor: "pointer" }}
