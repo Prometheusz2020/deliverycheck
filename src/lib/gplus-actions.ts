@@ -15,21 +15,25 @@ export async function loginGPlusUser(usuario: string, senha: string) {
       where: { usuario: cleanUsuario }
     });
 
-    // If no user exists in DB yet, create default account on first attempt
+    // If no user exists in DB yet, create initial account for the first login attempt
     const count = await prisma.loginGPlus.count();
-    if (count === 0 && (cleanUsuario.toLowerCase() === "admin" || cleanUsuario.toLowerCase() === "gplus")) {
+    if (count === 0 && !tenant) {
       tenant = await prisma.loginGPlus.create({
         data: {
           usuario: cleanUsuario,
           senha: senha,
-          nome: "Empresa GPlus Principal",
+          nome: cleanUsuario,
           isActive: true
         }
       });
     }
 
-    if (!tenant || tenant.senha !== senha || !tenant.isActive) {
-      return { success: false, error: "Usuário ou senha incorretos." };
+    if (!tenant) {
+      return { success: false, error: "Usuário não encontrado. Se for seu primeiro acesso, selecione 'Cadastrar nova empresa'." };
+    }
+
+    if (tenant.senha !== senha || !tenant.isActive) {
+      return { success: false, error: "Senha incorreta ou conta inativa." };
     }
 
     const cookieStore = await cookies();
