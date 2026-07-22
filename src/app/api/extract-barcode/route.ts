@@ -41,36 +41,57 @@ export async function POST(req: Request) {
 
     const modelsToTry = [
       "gemini-1.5-flash",
-      "gemini-2.0-flash",
       "gemini-1.5-pro",
-      "gemini-flash-latest"
+      "gemini-2.0-flash-exp",
+      "gemini-1.5-flash-8b"
     ];
 
     let response: Response | null = null;
     let usedModel = "";
     let lastError = "";
+    let isRateLimited = false;
 
     for (const model of modelsToTry) {
-      try {
-        const res = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(buildPayload())
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        try {
+          const res = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(buildPayload())
+            }
+          );
+
+          if (res.ok) {
+            response = res;
+            usedModel = model;
+            break;
           }
-        );
-        if (res.ok) {
-          response = res;
-          usedModel = model;
-          break;
-        } else {
+
           const errData = await res.text();
-          console.warn(`[Gemini Try ${model} Failed]:`, res.status, errData);
-          lastError = `Modelo ${model}: HTTP ${res.status}`;
+          console.warn(`[Gemini ${model} (Tentativa ${attempt})]:`, res.status, errData);
+
+          if (res.status === 429) {
+            isRateLimited = true;
+            lastError = `Limite de concorrência ou cota da API (HTTP 429).`;
+            if (attempt < 2) {
+              // Wait 1.2 seconds before retrying same model
+              await new Promise((r) => setTimeout(r, 1200 * attempt));
+              continue;
+            }
+          } else {
+            lastError = `Modelo ${model}: HTTP ${res.status}`;
+            break;
+          }
+        } catch (err: any) {
+          lastError = err.message || "Erro de conexão com Gemini";
+          break;
         }
-      } catch (err: any) {
-        lastError = err.message || "Erro de conexão";
+      }
+
+      if (response && response.ok) {
+        break;
       }
     }
 
@@ -78,7 +99,9 @@ export async function POST(req: Request) {
       console.error("❌ [Gemini API Final Error]:", lastError);
       return NextResponse.json({
         success: false,
-        error: `Falha na API Gemini (${lastError || "Sem resposta do serviço"})`
+        error: isRateLimited 
+          ? "⏱️ Limite de cota do Gemini atingido (HTTP 429). Por favor, aguarde de 10 a 15 segundos e envie a foto novamente."
+          : `Falha na API Gemini (${lastError || "Sem resposta do serviço"})`
       });
     }
 
