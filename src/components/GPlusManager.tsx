@@ -736,21 +736,6 @@ export default function GPlusManager() {
             Painel Standalone de Consulta e Importação
           </p>
         </div>
-        <a 
-          href="/restaurant" 
-          style={{ 
-            display: "flex", 
-            alignItems: "center", 
-            gap: "8px", 
-            fontSize: "12px", 
-            textDecoration: "none",
-            color: "var(--text-secondary)",
-            transition: "color 0.2s"
-          }}
-          className="hover-primary"
-        >
-          <ArrowLeft size={16} /> Voltar ao Command Center
-        </a>
       </header>
 
       {/* UPPER SECTION: CRUD Form */}
