@@ -746,7 +746,7 @@ export default function GPlusManager({ session }: GPlusManagerProps) {
         <div>
           <h1 style={{ fontSize: "2.2rem", marginBottom: "0.2rem" }}>PRODUTOS GPLUS</h1>
           <p style={{ color: "var(--text-muted)", fontSize: "10px", fontWeight: 900, textTransform: "uppercase", letterSpacing: "0.5em" }}>
-            Painel Standalone de Consulta e Importação
+            Painel de Importação de Produtos ZTILABS
           </p>
         </div>
 
