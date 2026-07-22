@@ -5,24 +5,31 @@ import { prisma } from "./db";
 
 export interface GPlusProductInput {
   id?: string;
+  loginGPlusId?: string | null;
   nome: string;
   grupo?: string | null;
   valor: number;
   codigoDeBarras?: string | null;
 }
 
-export async function getGPlusProducts(search?: string) {
+export async function getGPlusProducts(search?: string, loginGPlusId?: string) {
   try {
+    const whereConditions: any = {};
+
+    if (loginGPlusId) {
+      whereConditions.loginGPlusId = loginGPlusId;
+    }
+
+    if (search && search.trim() !== "") {
+      whereConditions.OR = [
+        { nome: { contains: search, mode: "insensitive" } },
+        { grupo: { contains: search, mode: "insensitive" } },
+        { codigoDeBarras: { contains: search, mode: "insensitive" } },
+      ];
+    }
+
     const products = await prisma.produtoGPlus.findMany({
-      where: search
-        ? {
-            OR: [
-              { nome: { contains: search, mode: "insensitive" } },
-              { grupo: { contains: search, mode: "insensitive" } },
-              { codigoDeBarras: { contains: search, mode: "insensitive" } },
-            ],
-          }
-        : undefined,
+      where: Object.keys(whereConditions).length > 0 ? whereConditions : undefined,
       orderBy: { nome: "asc" },
     });
     return { success: true, products };
@@ -41,7 +48,24 @@ export async function createOrUpdateProduct(data: GPlusProductInput) {
       return { success: false, error: "O valor do produto não pode ser negativo." };
     }
 
+    if (data.codigoDeBarras && data.codigoDeBarras.trim() !== "") {
+      const existingWithCode = await prisma.produtoGPlus.findFirst({
+        where: {
+          codigoDeBarras: data.codigoDeBarras.trim(),
+          ...(data.id ? { id: { not: data.id } } : {}),
+        },
+      });
+
+      if (existingWithCode) {
+        return {
+          success: false,
+          error: `O código de barras "${data.codigoDeBarras.trim()}" já está cadastrado no produto "${existingWithCode.nome}".`,
+        };
+      }
+    }
+
     const payload = {
+      loginGPlusId: data.loginGPlusId || null,
       nome: data.nome.trim(),
       grupo: data.grupo?.trim() || null,
       valor: Number(data.valor),
@@ -82,8 +106,9 @@ export async function deleteProduct(id: string) {
 }
 
 export async function importGPlusProducts(
-  products: Array<{ nome: string; grupo?: string | null; valor: number; codigoDeBarras?: string | null }>,
-  clearExisting: boolean
+  products: Array<{ nome: string; grupo?: string | null; valor: number; codigoDeBarras?: string | null; loginGPlusId?: string | null }>,
+  clearExisting: boolean,
+  loginGPlusId?: string
 ) {
   try {
     if (!Array.isArray(products) || products.length === 0) {
@@ -94,6 +119,7 @@ export async function importGPlusProducts(
     const validatedProducts = products
       .filter((p) => p && p.nome && p.nome.trim() !== "")
       .map((p) => ({
+        loginGPlusId: p.loginGPlusId || loginGPlusId || null,
         nome: p.nome.trim(),
         grupo: p.grupo?.trim() || null,
         valor: Math.max(0, Number(p.valor || 0)),
@@ -106,7 +132,7 @@ export async function importGPlusProducts(
 
     const result = await prisma.$transaction(async (tx) => {
       if (clearExisting) {
-        await tx.produtoGPlus.deleteMany({});
+        await tx.produtoGPlus.deleteMany(loginGPlusId ? { where: { loginGPlusId } } : undefined);
       }
 
       const createdCount = await tx.produtoGPlus.createMany({

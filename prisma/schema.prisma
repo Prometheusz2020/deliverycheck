@@ -95,14 +95,31 @@ model Payment {
   createdAt       DateTime @default(now())
 }
 
+model LoginGPlus {
+  id        String         @id @default(uuid())
+  usuario   String         @unique
+  senha     String
+  nome      String?
+  token     String?
+  isActive  Boolean        @default(true) @map("is_active")
+  createdAt DateTime       @default(now()) @map("created_at")
+  updatedAt DateTime       @updatedAt @map("updated_at")
+
+  produtos  ProdutoGPlus[]
+
+  @@map("login_gplus")
+}
+
 model ProdutoGPlus {
-  id             String   @id @default(uuid())
+  id             String      @id @default(uuid())
+  loginGPlusId   String?     @map("login_gplus_id")
+  loginGPlus     LoginGPlus? @relation(fields: [loginGPlusId], references: [id], onDelete: Cascade)
   nome           String
   grupo          String?
   valor          Float
-  codigoDeBarras String?  @map("codigo_de_barras")
-  createdAt      DateTime @default(now()) @map("created_at")
-  updatedAt      DateTime @updatedAt @map("updated_at")
+  codigoDeBarras String?     @map("codigo_de_barras")
+  createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
 
   @@map("produtos_gplus")
 }

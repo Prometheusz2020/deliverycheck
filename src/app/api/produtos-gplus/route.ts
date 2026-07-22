@@ -18,7 +18,11 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const url = new URL(req.url);
+    const loginGPlusId = url.searchParams.get("loginGPlusId") || url.searchParams.get("login_gplus_id");
+
     const products = await prisma.produtoGPlus.findMany({
+      where: loginGPlusId ? { loginGPlusId } : undefined,
       orderBy: { nome: "asc" },
     });
 
@@ -38,7 +42,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { products, clearExisting } = body;
+    const { products, clearExisting, loginGPlusId, login_gplus_id } = body;
+    const tenantId = loginGPlusId || login_gplus_id || null;
 
     if (!products || !Array.isArray(products)) {
       return NextResponse.json({ error: "Invalid products array" }, { status: 400 });
@@ -48,6 +53,7 @@ export async function POST(req: Request) {
     const validatedProducts = products
       .filter((p: any) => p && p.nome && String(p.nome).trim() !== "")
       .map((p: any) => ({
+        loginGPlusId: p.loginGPlusId || p.login_gplus_id || tenantId,
         nome: String(p.nome).trim(),
         grupo: p.grupo ? String(p.grupo).trim() : null,
         valor: Math.max(0, Number(p.valor || 0)),
@@ -60,7 +66,7 @@ export async function POST(req: Request) {
 
     const result = await prisma.$transaction(async (tx) => {
       if (clearExisting) {
-        await tx.produtoGPlus.deleteMany({});
+        await tx.produtoGPlus.deleteMany(tenantId ? { where: { loginGPlusId: tenantId } } : undefined);
       }
 
       const created = await tx.produtoGPlus.createMany({

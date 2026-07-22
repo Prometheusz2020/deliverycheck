@@ -45,6 +45,7 @@ export default function GPlusManager() {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(-1);
   const autocompleteRef = useRef<HTMLDivElement>(null);
+  const codigoInputRef = useRef<HTMLInputElement>(null);
 
   // Camera scanner states
   const [isScanning, setIsScanning] = useState(false);
@@ -150,6 +151,15 @@ export default function GPlusManager() {
     }
   };
 
+  // Helper to find existing product with same barcode
+  const findDuplicateBarcodeProduct = (code: string, currentId?: string) => {
+    if (!code || !code.trim()) return null;
+    const cleanCode = code.trim().toLowerCase();
+    return products.find(
+      p => p.codigoDeBarras && p.codigoDeBarras.trim().toLowerCase() === cleanCode && p.id !== currentId
+    );
+  };
+
   // Submit Form as New Product (cloning/duplicating)
   const handleSaveAsNew = async (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
@@ -162,6 +172,21 @@ export default function GPlusManager() {
     if (valorNum < 0) {
       showNotification("error", "O valor não pode ser negativo.");
       return;
+    }
+
+    if (formCodigo.trim()) {
+      const duplicate = findDuplicateBarcodeProduct(formCodigo);
+      if (duplicate) {
+        showNotification(
+          "error",
+          `⚠️ O código de barras "${formCodigo.trim()}" já está cadastrado no produto "${duplicate.nome}"!`
+        );
+        setTimeout(() => {
+          codigoInputRef.current?.focus();
+          codigoInputRef.current?.select();
+        }, 50);
+        return;
+      }
     }
 
     setIsSaving(true);
@@ -180,6 +205,12 @@ export default function GPlusManager() {
         fetchProducts();
       } else {
         showNotification("error", res.error || "Erro ao salvar produto.");
+        if (res.error?.includes("código de barras")) {
+          setTimeout(() => {
+            codigoInputRef.current?.focus();
+            codigoInputRef.current?.select();
+          }, 50);
+        }
       }
     } catch (err) {
       console.error(err);
@@ -211,6 +242,21 @@ export default function GPlusManager() {
       return;
     }
 
+    if (formCodigo.trim()) {
+      const duplicate = findDuplicateBarcodeProduct(formCodigo, formId);
+      if (duplicate) {
+        showNotification(
+          "error",
+          `⚠️ O código de barras "${formCodigo.trim()}" já está cadastrado no produto "${duplicate.nome}"!`
+        );
+        setTimeout(() => {
+          codigoInputRef.current?.focus();
+          codigoInputRef.current?.select();
+        }, 50);
+        return;
+      }
+    }
+
     setIsSaving(true);
     try {
       const res = await createOrUpdateProduct({
@@ -227,6 +273,12 @@ export default function GPlusManager() {
         fetchProducts();
       } else {
         showNotification("error", res.error || "Erro ao salvar produto.");
+        if (res.error?.includes("código de barras")) {
+          setTimeout(() => {
+            codigoInputRef.current?.focus();
+            codigoInputRef.current?.select();
+          }, 50);
+        }
       }
     } catch (err) {
       console.error(err);
@@ -831,6 +883,7 @@ export default function GPlusManager() {
                 </label>
                 <div style={{ display: "flex", gap: "8px" }}>
                   <input 
+                    ref={codigoInputRef}
                     type="text" 
                     value={formCodigo} 
                     onChange={e => setFormCodigo(e.target.value)} 
@@ -861,6 +914,11 @@ export default function GPlusManager() {
                     />
                   </label>
                 </div>
+                {formCodigo.trim() && findDuplicateBarcodeProduct(formCodigo, formId) && (
+                  <span style={{ color: "var(--warning)", fontSize: "11px", marginTop: "4px", display: "block", fontWeight: 600 }}>
+                    ⚠️ Este código de barras já pertence ao produto: "{findDuplicateBarcodeProduct(formCodigo, formId)?.nome}"
+                  </span>
+                )}
               </div>
 
               <div style={{ display: "flex", gap: "10px", marginTop: "1rem" }}>
