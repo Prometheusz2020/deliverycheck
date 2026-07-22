@@ -282,6 +282,7 @@ export async function extractBarcodeWithAI(base64Image: string) {
     ];
 
     let response: Response | null = null;
+    let usedModel = "";
     let lastError = "";
 
     for (const model of modelsToTry) {
@@ -292,6 +293,7 @@ export async function extractBarcodeWithAI(base64Image: string) {
         );
         if (res.ok) {
           response = res;
+          usedModel = model;
           break;
         } else {
           lastError = `Modelo ${model}: HTTP ${res.status}`;
@@ -302,7 +304,7 @@ export async function extractBarcodeWithAI(base64Image: string) {
     }
 
     if (!response || !response.ok) {
-      console.error("Gemini API Error Response:", lastError);
+      console.error("❌ [IA Gemini Error]:", lastError);
       return { success: false, error: `Falha na API Gemini (${lastError || "Sem resposta"})` };
     }
 
@@ -310,6 +312,7 @@ export async function extractBarcodeWithAI(base64Image: string) {
     const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
 
     if (!rawText || rawText.toUpperCase().includes("NONE")) {
+      console.log(`⚠️ [IA Gemini]: Resposta sem código de barras válido ("${rawText}")`);
       return { success: false, error: "Código de barras não identificado na foto." };
     }
 
@@ -317,6 +320,7 @@ export async function extractBarcodeWithAI(base64Image: string) {
     const digitsOnly = rawText.replace(/[^0-9]/g, "");
 
     if (digitsOnly && digitsOnly.length >= 4) {
+      console.log(`✅ [IA Gemini Success]: Código extraído: "${digitsOnly}" usando modelo "${usedModel}"`);
       return { success: true, barcode: digitsOnly };
     }
 
