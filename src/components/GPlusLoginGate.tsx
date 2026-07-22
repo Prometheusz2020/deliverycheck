@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { Lock, Loader2, ArrowRight, UserPlus, LogIn, AlertCircle } from "lucide-react";
 import { loginGPlusUser, createGPlusTenantAccount } from "@/lib/gplus-actions";
+import ThemeToggle from "./ThemeToggle";
 
 export default function GPlusLoginGate() {
   const [isRegistering, setIsRegistering] = useState(false);
@@ -45,7 +46,10 @@ export default function GPlusLoginGate() {
 
   return (
     <div className="animate-entrance" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '85vh', padding: '1rem' }}>
-      <div className="card-premium" style={{ width: '100%', maxWidth: '420px', textAlign: 'center', padding: '2.5rem 2rem' }}>
+      <div className="card-premium" style={{ width: '100%', maxWidth: '420px', textAlign: 'center', padding: '2.5rem 2rem', position: 'relative' }}>
+        <div style={{ position: 'absolute', top: '1rem', right: '1rem' }}>
+          <ThemeToggle />
+        </div>
         <div style={{ padding: '1.2rem', background: 'rgba(0, 242, 255, 0.1)', borderRadius: '24px', display: 'inline-flex', marginBottom: '1.5rem', border: '1px solid rgba(0, 242, 255, 0.2)' }}>
           <Lock size={42} style={{ color: 'var(--primary)' }} />
         </div>

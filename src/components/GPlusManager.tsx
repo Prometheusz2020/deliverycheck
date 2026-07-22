@@ -16,6 +16,8 @@ import {
   GPlusProductInput 
 } from "@/lib/gplus-actions";
 
+import ThemeToggle from "./ThemeToggle";
+
 interface Product {
   id: string;
   nome: string;
@@ -750,32 +752,35 @@ export default function GPlusManager({ session }: GPlusManagerProps) {
           </p>
         </div>
 
-        {session && (
-          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-            <div style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "8px",
-              padding: "0.5rem 1rem",
-              background: "rgba(0, 242, 255, 0.08)",
-              border: "1px solid rgba(0, 242, 255, 0.2)",
-              borderRadius: "20px",
-              fontSize: "12px",
-              color: "var(--primary)"
-            }}>
-              <User size={14} />
-              <span style={{ fontWeight: 700 }}>{session.nome || session.usuario}</span>
-            </div>
-            <button
-              onClick={() => logoutGPlusUser()}
-              className="btn-outline"
-              style={{ padding: "0.5rem 1rem", fontSize: "12px", gap: "6px", display: "flex", alignItems: "center" }}
-              title="Sair do painel GPlus"
-            >
-              <LogOut size={14} /> Sair
-            </button>
-          </div>
-        )}
+        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          <ThemeToggle />
+          {session && (
+            <>
+              <div style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                padding: "0.5rem 1rem",
+                background: "rgba(0, 242, 255, 0.08)",
+                border: "1px solid rgba(0, 242, 255, 0.2)",
+                borderRadius: "20px",
+                fontSize: "12px",
+                color: "var(--primary)"
+              }}>
+                <User size={14} />
+                <span style={{ fontWeight: 700 }}>{session.nome || session.usuario}</span>
+              </div>
+              <button
+                onClick={() => logoutGPlusUser()}
+                className="btn-outline"
+                style={{ padding: "0.5rem 1rem", fontSize: "12px", gap: "6px", display: "flex", alignItems: "center" }}
+                title="Sair do painel GPlus"
+              >
+                <LogOut size={14} /> Sair
+              </button>
+            </>
+          )}
+        </div>
       </header>
 
       {/* UPPER SECTION: CRUD Form */}
