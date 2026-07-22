@@ -1,7 +1,110 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
 import { prisma } from "./db";
+
+export async function loginGPlusUser(usuario: string, senha: string) {
+  try {
+    if (!usuario || !senha) {
+      return { success: false, error: "Usuário e senha são obrigatórios." };
+    }
+
+    const cleanUsuario = usuario.trim();
+    let tenant = await prisma.loginGPlus.findUnique({
+      where: { usuario: cleanUsuario }
+    });
+
+    // If no user exists in DB yet, create default account on first attempt
+    const count = await prisma.loginGPlus.count();
+    if (count === 0 && (cleanUsuario.toLowerCase() === "admin" || cleanUsuario.toLowerCase() === "gplus")) {
+      tenant = await prisma.loginGPlus.create({
+        data: {
+          usuario: cleanUsuario,
+          senha: senha,
+          nome: "Empresa GPlus Principal",
+          isActive: true
+        }
+      });
+    }
+
+    if (!tenant || tenant.senha !== senha || !tenant.isActive) {
+      return { success: false, error: "Usuário ou senha incorretos." };
+    }
+
+    const cookieStore = await cookies();
+    cookieStore.set("gplus_tenant_id", tenant.id, { path: "/", maxAge: 60 * 60 * 24 * 7 });
+    cookieStore.set("gplus_tenant_user", tenant.usuario, { path: "/", maxAge: 60 * 60 * 24 * 7 });
+    if (tenant.nome) {
+      cookieStore.set("gplus_tenant_name", tenant.nome, { path: "/", maxAge: 60 * 60 * 24 * 7 });
+    }
+
+    return { success: true, tenant: { id: tenant.id, usuario: tenant.usuario, nome: tenant.nome } };
+  } catch (error) {
+    console.error("Login GPlus error:", error);
+    return { success: false, error: "Erro interno ao realizar login." };
+  }
+}
+
+export async function createGPlusTenantAccount(usuario: string, senha: string, nome?: string) {
+  try {
+    if (!usuario || !senha) {
+      return { success: false, error: "Usuário e senha são obrigatórios." };
+    }
+
+    const cleanUsuario = usuario.trim();
+    const existing = await prisma.loginGPlus.findUnique({
+      where: { usuario: cleanUsuario }
+    });
+
+    if (existing) {
+      return { success: false, error: "Este nome de usuário já está em uso." };
+    }
+
+    const tenant = await prisma.loginGPlus.create({
+      data: {
+        usuario: cleanUsuario,
+        senha: senha,
+        nome: nome?.trim() || cleanUsuario,
+        isActive: true
+      }
+    });
+
+    const cookieStore = await cookies();
+    cookieStore.set("gplus_tenant_id", tenant.id, { path: "/", maxAge: 60 * 60 * 24 * 7 });
+    cookieStore.set("gplus_tenant_user", tenant.usuario, { path: "/", maxAge: 60 * 60 * 24 * 7 });
+    if (tenant.nome) {
+      cookieStore.set("gplus_tenant_name", tenant.nome, { path: "/", maxAge: 60 * 60 * 24 * 7 });
+    }
+
+    return { success: true, tenant: { id: tenant.id, usuario: tenant.usuario, nome: tenant.nome } };
+  } catch (error) {
+    console.error("Create GPlus account error:", error);
+    return { success: false, error: "Erro ao criar conta de login." };
+  }
+}
+
+export async function getGPlusSession() {
+  try {
+    const cookieStore = await cookies();
+    const id = cookieStore.get("gplus_tenant_id")?.value;
+    const user = cookieStore.get("gplus_tenant_user")?.value;
+    const name = cookieStore.get("gplus_tenant_name")?.value;
+
+    if (!id || !user) return null;
+    return { id, usuario: user, nome: name || user };
+  } catch (error) {
+    return null;
+  }
+}
+
+export async function logoutGPlusUser() {
+  const cookieStore = await cookies();
+  cookieStore.delete("gplus_tenant_id");
+  cookieStore.delete("gplus_tenant_user");
+  cookieStore.delete("gplus_tenant_name");
+  revalidatePath("/produtos-gplus");
+}
 
 export interface GPlusProductInput {
   id?: string;

@@ -5,13 +5,14 @@ import {
   Plus, Edit, Trash2, Search, FileText, 
   CheckCircle2, AlertCircle, X, ChevronLeft, ChevronRight, 
   Loader2, ArrowLeft, RefreshCw, Camera, Download, Zap, Upload,
-  Copy
+  Copy, LogOut, User
 } from "lucide-react";
 import { 
   getGPlusProducts, 
   createOrUpdateProduct, 
   deleteProduct, 
   extractBarcodeWithAI,
+  logoutGPlusUser,
   GPlusProductInput 
 } from "@/lib/gplus-actions";
 
@@ -25,7 +26,15 @@ interface Product {
   updatedAt: Date;
 }
 
-export default function GPlusManager() {
+interface GPlusManagerProps {
+  session?: {
+    id: string;
+    usuario: string;
+    nome: string;
+  };
+}
+
+export default function GPlusManager({ session }: GPlusManagerProps) {
   // CRUD states
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -64,7 +73,7 @@ export default function GPlusManager() {
   const fetchProducts = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await getGPlusProducts(searchTerm);
+      const res = await getGPlusProducts(searchTerm, session?.id);
       if (res.success && res.products) {
         setProducts(res.products as any);
         setCurrentPage(1); // Reset page on new search
@@ -77,7 +86,7 @@ export default function GPlusManager() {
     } finally {
       setLoading(false);
     }
-  }, [searchTerm]);
+  }, [searchTerm, session?.id]);
 
   useEffect(() => {
     fetchProducts();
@@ -193,6 +202,7 @@ export default function GPlusManager() {
     try {
       const res = await createOrUpdateProduct({
         id: undefined, // Clear ID to force creation of a new product
+        loginGPlusId: session?.id || null,
         nome: formNome,
         grupo: formGrupo || null,
         valor: valorNum,
@@ -261,6 +271,7 @@ export default function GPlusManager() {
     try {
       const res = await createOrUpdateProduct({
         id: formId,
+        loginGPlusId: session?.id || null,
         nome: formNome,
         grupo: formGrupo || null,
         valor: valorNum,
@@ -728,7 +739,9 @@ export default function GPlusManager() {
         alignItems: "center", 
         borderBottom: "1px solid rgba(255,255,255,0.05)", 
         paddingBottom: "1.5rem",
-        marginBottom: "1rem"
+        marginBottom: "1rem",
+        flexWrap: "wrap",
+        gap: "1rem"
       }}>
         <div>
           <h1 style={{ fontSize: "2.2rem", marginBottom: "0.2rem" }}>PRODUTOS GPLUS</h1>
@@ -736,6 +749,33 @@ export default function GPlusManager() {
             Painel Standalone de Consulta e Importação
           </p>
         </div>
+
+        {session && (
+          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            <div style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              padding: "0.5rem 1rem",
+              background: "rgba(0, 242, 255, 0.08)",
+              border: "1px solid rgba(0, 242, 255, 0.2)",
+              borderRadius: "20px",
+              fontSize: "12px",
+              color: "var(--primary)"
+            }}>
+              <User size={14} />
+              <span style={{ fontWeight: 700 }}>{session.nome || session.usuario}</span>
+            </div>
+            <button
+              onClick={() => logoutGPlusUser()}
+              className="btn-outline"
+              style={{ padding: "0.5rem 1rem", fontSize: "12px", gap: "6px", display: "flex", alignItems: "center" }}
+              title="Sair do painel GPlus"
+            >
+              <LogOut size={14} /> Sair
+            </button>
+          </div>
+        )}
       </header>
 
       {/* UPPER SECTION: CRUD Form */}
