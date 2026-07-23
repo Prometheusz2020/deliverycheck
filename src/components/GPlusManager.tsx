@@ -254,7 +254,7 @@ export default function GPlusManager({ session }: GPlusManagerProps) {
 
     const delayDebounceFn = setTimeout(async () => {
       try {
-        const res = await getGPlusProducts(formNome);
+        const res = await getGPlusProducts(formNome, session?.id);
         if (res.success && res.products) {
           // Filter out the current product being edited
           const filtered = (res.products as Product[]).filter(p => p.id !== formId);
@@ -266,7 +266,7 @@ export default function GPlusManager({ session }: GPlusManagerProps) {
     }, 300);
 
     return () => clearTimeout(delayDebounceFn);
-  }, [formNome, formId]);
+  }, [formNome, formId, session?.id]);
 
   const handleSelectSuggestion = (suggestion: Product) => {
     setFormId(suggestion.id);
@@ -522,30 +522,50 @@ export default function GPlusManager({ session }: GPlusManagerProps) {
     }
   };
 
-  const tryLookupOnline = async (barcode: string) => {
-    if (!barcode || barcode.length < 8) return;
+  const handleScanSuccess = async (decodedText: string) => {
+    playBeep();
+    stopScanning();
+
+    const cleanCode = decodedText.trim();
+    setFormCodigo(cleanCode);
+
+    // 1. Verificar se o código escaneado já pertence a um produto cadastrado
+    const existingProduct = products.find(
+      p => p.codigoDeBarras && p.codigoDeBarras.trim().toLowerCase() === cleanCode.toLowerCase()
+    );
+
+    if (existingProduct) {
+      setFormId(existingProduct.id);
+      setFormNome(existingProduct.nome);
+      setFormGrupo(existingProduct.grupo || "");
+      setFormValor(existingProduct.valor.toString());
+      showNotification("success", `⚠️ Produto existente carregado: ${existingProduct.nome}`);
+      return;
+    }
+
+    // 2. Se for um código novo (não cadastrado), limpa o ID do formulário
+    setFormId(undefined);
+    showNotification("success", `Código ${cleanCode} lido. Buscando informações...`);
+
+    // 3. Tenta buscar na base online
     try {
-      const res = await lookupBarcodeOnline(barcode);
-      if (res.success && res.product) {
-        if (!formNome.trim() && res.product.nome) {
-          setFormNome(res.product.nome);
-        }
-        if (!formGrupo.trim() && res.product.grupo) {
-          setFormGrupo(res.product.grupo);
-        }
+      const res = await lookupBarcodeOnline(cleanCode);
+      if (res.success && res.product && res.product.nome) {
+        // Substitui pelo nome e grupo encontrados
+        setFormNome(res.product.nome);
+        setFormGrupo(res.product.grupo || "");
         showNotification("success", `✨ Produto identificado: ${res.product.nome}`);
+      } else {
+        // Se não encontrou online, deixa o nome e grupo EM BRANCO para evitar cadastrar com nome antigo/errado!
+        setFormNome("");
+        setFormGrupo("");
+        showNotification("error", `Código ${cleanCode} lido. Preencha o nome do produto.`);
       }
     } catch (e) {
-      console.error("Online lookup error:", e);
+      setFormNome("");
+      setFormGrupo("");
+      showNotification("error", `Código ${cleanCode} lido. Preencha o nome do produto.`);
     }
-  };
-
-  const handleScanSuccess = (decodedText: string) => {
-    playBeep();
-    setFormCodigo(decodedText);
-    showNotification("success", `Código escaneado: ${decodedText}`);
-    tryLookupOnline(decodedText);
-    stopScanning();
   };
 
   const preprocessImage = (file: File, targetWidth: number, enhanceContrast: boolean = false): Promise<File> => {
@@ -705,13 +725,7 @@ export default function GPlusManager({ session }: GPlusManagerProps) {
       const decodedText = await detectBarcodeLocally(file);
 
       if (decodedText) {
-        playBeep();
-        setFormCodigo(decodedText);
-        showNotification("success", `📷 Código identificado: ${decodedText}`);
-        tryLookupOnline(decodedText);
-        if (isScanning) {
-          stopScanning();
-        }
+        await handleScanSuccess(decodedText);
       } else {
         showNotification(
           "error",

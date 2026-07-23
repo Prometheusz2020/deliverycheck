@@ -27,7 +27,7 @@ model Delivery {
   status         String    @default("PENDENTE") // PENDENTE, EM ROTA, ENTREGUE, CANCELADO
   driverId       String?
   driver         Driver?   @relation(fields: [driverId], references: [id])
-  deliveryPerson String?   // Nome textual para redundância
+  deliveryPerson String? // Nome textual para redundância
   scannedAt      DateTime  @default(now())
   deliveredAt    DateTime?
   paymentMethod  String?
@@ -45,67 +45,67 @@ model Admin {
 }
 
 model Customer {
-  id              String       @id @default(uuid())
-  name            String       @unique
-  phone           String?
-  address         String?
-  bestPaymentDay  Int?         // Dia do mês (1 a 31)
-  creditLimit     Float        @default(0) // 0 significa sem limite
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
-  gplusId         Int?         @unique // ID do cliente no banco Firebird GPlus
-  
-  sales           CreditSale[]
-  payments        Payment[]
+  id             String   @id @default(uuid())
+  name           String   @unique
+  phone          String?
+  address        String?
+  bestPaymentDay Int? // Dia do mês (1 a 31)
+  creditLimit    Float    @default(0) // 0 significa sem limite
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  gplusId        Int?     @unique // ID do cliente no banco Firebird GPlus
+
+  sales    CreditSale[]
+  payments Payment[]
 }
 
 model CreditSale {
-  id              String           @id @default(uuid())
-  customerId      String
-  customer        Customer         @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  date            DateTime         @default(now())
-  totalAmount     Float
-  status          String           @default("PENDENTE") // PENDENTE, PAGO
-  notes           String?
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
-  gplusId         String?          @unique // ID único do GPlus para evitar duplicidades
-  
-  items           CreditSaleItem[]
+  id          String   @id @default(uuid())
+  customerId  String
+  customer    Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  date        DateTime @default(now())
+  totalAmount Float
+  status      String   @default("PENDENTE") // PENDENTE, PAGO
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  gplusId     String?  @unique // ID único do GPlus para evitar duplicidades
+
+  items CreditSaleItem[]
 }
 
 model CreditSaleItem {
-  id              String     @id @default(uuid())
-  saleId          String
-  sale            CreditSale @relation(fields: [saleId], references: [id], onDelete: Cascade)
-  description     String
-  quantity        Float      @default(1)
-  unitPrice       Float
-  totalPrice      Float
+  id          String     @id @default(uuid())
+  saleId      String
+  sale        CreditSale @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  description String
+  quantity    Float      @default(1)
+  unitPrice   Float
+  totalPrice  Float
 }
 
 model Payment {
-  id              String   @id @default(uuid())
-  customerId      String
-  customer        Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  date            DateTime @default(now())
-  amount          Float
-  paymentMethod   String   @default("DINHEIRO") // PIX, DINHEIRO, DEBITO, CREDITO
-  notes           String?
-  createdAt       DateTime @default(now())
+  id            String   @id @default(uuid())
+  customerId    String
+  customer      Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  date          DateTime @default(now())
+  amount        Float
+  paymentMethod String   @default("DINHEIRO") // PIX, DINHEIRO, DEBITO, CREDITO
+  notes         String?
+  createdAt     DateTime @default(now())
 }
 
 model LoginGPlus {
-  id        String         @id @default(uuid())
-  usuario   String         @unique
+  id        String   @id @default(uuid())
+  usuario   String   @unique
   senha     String
   nome      String?
   token     String?
-  isActive  Boolean        @default(true) @map("is_active")
-  createdAt DateTime       @default(now()) @map("created_at")
-  updatedAt DateTime       @updatedAt @map("updated_at")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
-  produtos  ProdutoGPlus[]
+  produtos ProdutoGPlus[]
 
   @@map("login_gplus")
 }

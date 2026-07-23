@@ -249,10 +249,19 @@ export async function lookupBarcodeOnline(barcode: string) {
       return { success: false, error: "Código de barras muito curto." };
     }
 
-    const response = await fetch(`https://br.openfoodfacts.org/api/v0/product/${cleanBarcode}.json`, {
-      headers: { "User-Agent": "DeliveryCheckApp/1.0" },
-      next: { revalidate: 86400 }
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3500);
+
+    let response;
+    try {
+      response = await fetch(`https://br.openfoodfacts.org/api/v0/product/${cleanBarcode}.json`, {
+        headers: { "User-Agent": "DeliveryCheckApp/1.0" },
+        signal: controller.signal,
+        next: { revalidate: 86400 }
+      });
+    } finally {
+      clearTimeout(timeoutId);
+    }
 
     if (response.ok) {
       const data = await response.json();
