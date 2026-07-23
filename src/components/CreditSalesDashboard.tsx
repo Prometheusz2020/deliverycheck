@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { 
   Users, DollarSign, Plus, Trash2, Calendar, Search, 
   FileText, CheckCircle, UserPlus, Loader2, Phone, 
-  MapPin, Clock, X, Info, AlertTriangle, ArrowRight, CornerDownRight
+  MapPin, Clock, X, Info, AlertTriangle, ArrowRight, CornerDownRight, Printer
 } from "lucide-react";
 import { 
   getCustomers, addCustomer, editCustomer, deleteCustomer, 
@@ -105,6 +105,191 @@ export default function CreditSalesDashboard() {
   const [payNotes, setPayNotes] = useState("");
   const [isSubmittingPayment, setIsSubmittingPayment] = useState(false);
   const [recentSales, setRecentSales] = useState<any[]>([]);
+
+  // Estado para Modal de Impressão Elgin i9 (40 colunas)
+  const [printModal, setPrintModal] = useState<{
+    title: string;
+    lines: string[];
+  } | null>(null);
+
+  // Auxiliares para formatação de 40 colunas em impressora térmica (Elgin i9)
+  const format40Line = (left: string = "", right: string = "", width: number = 40): string => {
+    const maxLeftLen = width - right.length - 1;
+    const leftClean = left.length > maxLeftLen ? left.substring(0, maxLeftLen) : left;
+    const spaces = Math.max(1, width - leftClean.length - right.length);
+    return leftClean + " ".repeat(spaces) + right;
+  };
+
+  const padCenter = (text: string, width: number = 40): string => {
+    const clean = text.substring(0, width);
+    const leftPadding = Math.max(0, Math.floor((width - clean.length) / 2));
+    return " ".repeat(leftPadding) + clean;
+  };
+
+  // 1. Relatório Geral da Carteira de Fiados (Todos os Devedores)
+  const handlePrintGeneralReport = () => {
+    const nowStr = new Date().toLocaleString('pt-BR');
+    const totalDebt = customers.reduce((acc, c) => acc + c.balance, 0);
+    const debtors = customers.filter(c => c.balance > 0);
+
+    const lines: string[] = [
+      "========================================",
+      padCenter("DELIVERY CHECK / GPLUS"),
+      padCenter("RELATORIO GERAL DE DEVEDORES"),
+      `Data/Hora: ${nowStr}`,
+      "========================================",
+      format40Line("CLIENTE", "SALDO DEVEDOR"),
+      "----------------------------------------"
+    ];
+
+    if (debtors.length === 0) {
+      lines.push(padCenter("NENHUM CLIENTE EM DEBITO"));
+    } else {
+      debtors.forEach(c => {
+        lines.push(format40Line(c.name.toUpperCase(), `R$ ${c.balance.toFixed(2)}`));
+        if (c.phone) lines.push(`  Tel: ${c.phone}`);
+      });
+    }
+
+    lines.push("----------------------------------------");
+    lines.push(format40Line(`TOTAL DEVEDORES: ${debtors.length}`, ""));
+    lines.push(format40Line("TOTAL DA CARTEIRA:", `R$ ${totalDebt.toFixed(2)}`));
+    lines.push("========================================");
+    lines.push(padCenter("IMPRESSORA ELGIN I9 (40 COL)"));
+    lines.push("\n\n\n");
+
+    setPrintModal({
+      title: "Relatório Geral de Devedores (Carteira Fiado)",
+      lines
+    });
+  };
+
+  // 2. Extrato Completo do Cliente Selecionado
+  const handlePrintCustomerLedger = () => {
+    if (!customerDetails) return;
+    const nowStr = new Date().toLocaleString('pt-BR');
+
+    const lines: string[] = [
+      "========================================",
+      padCenter("DELIVERY CHECK / GPLUS"),
+      padCenter("EXTRATO DE CONTA FIADO"),
+      `Data/Hora: ${nowStr}`,
+      "========================================",
+      `CLIENTE: ${customerDetails.name.toUpperCase()}`,
+    ];
+
+    if (customerDetails.phone) lines.push(`TEL: ${customerDetails.phone}`);
+    if (customerDetails.address) lines.push(`END: ${customerDetails.address}`);
+    if (customerDetails.bestPaymentDay) lines.push(`MELHOR DIA PGTO: DIA ${customerDetails.bestPaymentDay}`);
+
+    lines.push("----------------------------------------");
+    lines.push("HISTORICO DE COMPRAS (FIADO):");
+    if (processedData.allocatedSales.length === 0) {
+      lines.push("  (Nenhuma compra registrada)");
+    } else {
+      processedData.allocatedSales.forEach(s => {
+        const dateStr = formatDate(s.date);
+        lines.push(format40Line(`${dateStr} Comanda`, `R$ ${s.totalAmount.toFixed(2)}`));
+        s.items.forEach(item => {
+          lines.push(`  ${item.quantity}x ${item.description.substring(0, 22)}`);
+        });
+      });
+    }
+
+    lines.push("----------------------------------------");
+    lines.push("HISTORICO DE PAGAMENTOS:");
+    if (customerDetails.payments.length === 0) {
+      lines.push("  (Nenhum pagamento efetuado)");
+    } else {
+      customerDetails.payments.forEach(p => {
+        const dateStr = formatDate(p.date);
+        lines.push(format40Line(`${dateStr} (${p.paymentMethod})`, `R$ ${p.amount.toFixed(2)}`));
+      });
+    }
+
+    lines.push("----------------------------------------");
+    lines.push(format40Line("TOTAL COMPRAS:", `R$ ${customerDetails.totalSales.toFixed(2)}`));
+    lines.push(format40Line("TOTAL PAGOS:", `R$ ${customerDetails.totalPayments.toFixed(2)}`));
+    lines.push("========================================");
+    lines.push(format40Line("SALDO DEVEDOR ATUAL:", `R$ ${customerDetails.balance.toFixed(2)}`));
+    lines.push("========================================");
+    lines.push("\nAssinatura do Cliente:\n\n");
+    lines.push("________________________________________");
+    lines.push(padCenter(customerDetails.name.toUpperCase()));
+    lines.push("\n\n\n");
+
+    setPrintModal({
+      title: `Extrato de Fiado - ${customerDetails.name}`,
+      lines
+    });
+  };
+
+  // 3. Comprovante de Venda Fiado (Comanda Específica)
+  const handlePrintSaleTicket = (sale: CreditSaleType) => {
+    const custName = customerDetails?.name || "CLIENTE";
+    const dateStr = formatDate(sale.date);
+
+    const lines: string[] = [
+      "========================================",
+      padCenter("DELIVERY CHECK / GPLUS"),
+      padCenter("COMPROVANTE DE VENDA FIADO"),
+      `Data: ${dateStr}`,
+      "========================================",
+      `CLIENTE: ${custName.toUpperCase()}`,
+      sale.gplusId ? `REF GPLUS: #${sale.gplusId}` : "",
+      "----------------------------------------",
+      format40Line("QTD ITEM", "TOTAL (R$)"),
+      "----------------------------------------"
+    ].filter(Boolean);
+
+    sale.items.forEach(item => {
+      lines.push(format40Line(`${item.quantity}x ${item.description}`, `R$ ${item.totalPrice.toFixed(2)}`));
+    });
+
+    lines.push("----------------------------------------");
+    lines.push(format40Line("VALOR TOTAL:", `R$ ${sale.totalAmount.toFixed(2)}`));
+    lines.push("----------------------------------------");
+    lines.push("Reconheco e pagarei a divida acima.");
+    lines.push("\nAssinatura do Cliente:\n\n");
+    lines.push("________________________________________");
+    lines.push(padCenter(custName.toUpperCase()));
+    lines.push("\n\n\n");
+
+    setPrintModal({
+      title: `Comprovante de Venda - ${custName}`,
+      lines
+    });
+  };
+
+  // 4. Recibo de Pagamento (Amortização)
+  const handlePrintPaymentTicket = (payment: PaymentType) => {
+    const custName = customerDetails?.name || "CLIENTE";
+    const dateStr = formatDate(payment.date);
+
+    const lines: string[] = [
+      "========================================",
+      padCenter("DELIVERY CHECK / GPLUS"),
+      padCenter("RECIBO DE PAGAMENTO FIADO"),
+      `Data: ${dateStr}`,
+      "========================================",
+      `CLIENTE: ${custName.toUpperCase()}`,
+      `FORMA PGTO: ${payment.paymentMethod}`,
+      "----------------------------------------",
+      format40Line("VALOR RECEBIDO:", `R$ ${payment.amount.toFixed(2)}`),
+      "----------------------------------------",
+      format40Line("SALDO RESTANTE:", `R$ ${customerDetails?.balance.toFixed(2) || "0.00"}`),
+      "========================================",
+      "\nRecebido por:\n\n",
+      "________________________________________",
+      padCenter("ESTABELECIMENTO"),
+      "\n\n\n"
+    ];
+
+    setPrintModal({
+      title: `Recibo de Pagamento - ${custName}`,
+      lines
+    });
+  };
 
   // Carregar as vendas recentes across todos os clientes
   const fetchRecentSales = useCallback(async () => {
@@ -494,22 +679,32 @@ export default function CreditSalesDashboard() {
         </div>
 
         {activeTab === 'customers' && (
-          <button 
-            onClick={() => {
-              setEditingCustomer(null);
-              setCustName("");
-              setCustPhone("");
-              setCustAddress("");
-              setCustBestDay("");
-              setCustLimit("");
-              setFormError("");
-              setShowCustomerForm(true);
-            }} 
-            className="btn-main" 
-            style={{ padding: '0.5rem 1.2rem', fontSize: '11px', borderRadius: '10px', height: '38px' }}
-          >
-            <UserPlus size={14} /> Novo Cliente
-          </button>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <button 
+              onClick={handlePrintGeneralReport}
+              className="btn-outline" 
+              style={{ padding: '0.5rem 1rem', fontSize: '11px', borderRadius: '10px', height: '38px', gap: '6px', display: 'flex', alignItems: 'center' }}
+              title="Imprimir Relatório de Todos os Devedores (Elgin i9 40 Colunas)"
+            >
+              <Printer size={14} /> Relatório Geral (40 col)
+            </button>
+            <button 
+              onClick={() => {
+                setEditingCustomer(null);
+                setCustName("");
+                setCustPhone("");
+                setCustAddress("");
+                setCustBestDay("");
+                setCustLimit("");
+                setFormError("");
+                setShowCustomerForm(true);
+              }} 
+              className="btn-main" 
+              style={{ padding: '0.5rem 1.2rem', fontSize: '11px', borderRadius: '10px', height: '38px' }}
+            >
+              <UserPlus size={14} /> Novo Cliente
+            </button>
+          </div>
         )}
       </div>
 
@@ -778,7 +973,17 @@ export default function CreditSalesDashboard() {
 
                     {/* Bloco de saldos */}
                     <div style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.05)', padding: '1rem 1.5rem', borderRadius: '12px', textAlign: 'right' }}>
-                      <p style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: 900, textTransform: 'uppercase', marginBottom: '4px' }}>Saldo Devedor Atual</p>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px', gap: '12px' }}>
+                        <button 
+                          onClick={handlePrintCustomerLedger}
+                          className="btn-outline"
+                          style={{ padding: '0.3rem 0.6rem', fontSize: '10px', gap: '4px', display: 'flex', alignItems: 'center' }}
+                          title="Imprimir Extrato Completo do Cliente na Elgin i9 (40 colunas)"
+                        >
+                          <Printer size={12} /> Imprimir Extrato
+                        </button>
+                        <p style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: 900, textTransform: 'uppercase', margin: 0 }}>Saldo Devedor Atual</p>
+                      </div>
                       <h3 style={{ fontSize: '2rem', fontStyle: 'normal', color: customerDetails.balance > 0 ? 'var(--danger)' : 'var(--success)' }}>
                         R$ {customerDetails.balance.toFixed(2)}
                       </h3>
@@ -837,13 +1042,22 @@ export default function CreditSalesDashboard() {
                         ) : (
                           processedData.allocatedSales.map(sale => (
                             <div key={sale.id} style={{ background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.04)', padding: '10px 12px', borderRadius: '8px', position: 'relative' }}>
-                              <button 
-                                onClick={() => handleDeleteSale(sale.id)}
-                                style={{ position: 'absolute', top: '8px', right: '8px', background: 'none', border: 'none', color: 'var(--danger)', opacity: 0.6, cursor: 'pointer' }}
-                                title="Excluir Venda"
-                              >
-                                <Trash2 size={12} />
-                              </button>
+                              <div style={{ position: 'absolute', top: '8px', right: '8px', display: 'flex', gap: '6px' }}>
+                                <button 
+                                  onClick={() => handlePrintSaleTicket(sale)}
+                                  style={{ background: 'none', border: 'none', color: 'var(--primary)', opacity: 0.8, cursor: 'pointer' }}
+                                  title="Imprimir Comprovante de Venda (40 colunas)"
+                                >
+                                  <Printer size={12} />
+                                </button>
+                                <button 
+                                  onClick={() => handleDeleteSale(sale.id)}
+                                  style={{ background: 'none', border: 'none', color: 'var(--danger)', opacity: 0.6, cursor: 'pointer' }}
+                                  title="Excluir Venda"
+                                >
+                                  <Trash2 size={12} />
+                                </button>
+                              </div>
                               
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
                                 <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
@@ -916,13 +1130,22 @@ export default function CreditSalesDashboard() {
                         ) : (
                           customerDetails.payments.map(payment => (
                             <div key={payment.id} style={{ background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.04)', padding: '10px 12px', borderRadius: '8px', position: 'relative' }}>
-                              <button 
-                                onClick={() => handleDeletePayment(payment.id)}
-                                style={{ position: 'absolute', top: '8px', right: '8px', background: 'none', border: 'none', color: 'var(--danger)', opacity: 0.6, cursor: 'pointer' }}
-                                title="Excluir Pagamento"
-                              >
-                                <Trash2 size={12} />
-                              </button>
+                              <div style={{ position: 'absolute', top: '8px', right: '8px', display: 'flex', gap: '6px' }}>
+                                <button 
+                                  onClick={() => handlePrintPaymentTicket(payment)}
+                                  style={{ background: 'none', border: 'none', color: 'var(--accent)', opacity: 0.8, cursor: 'pointer' }}
+                                  title="Imprimir Recibo de Pagamento (40 colunas)"
+                                >
+                                  <Printer size={12} />
+                                </button>
+                                <button 
+                                  onClick={() => handleDeletePayment(payment.id)}
+                                  style={{ background: 'none', border: 'none', color: 'var(--danger)', opacity: 0.6, cursor: 'pointer' }}
+                                  title="Excluir Pagamento"
+                                >
+                                  <Trash2 size={12} />
+                                </button>
+                              </div>
 
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
                                 <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{formatDate(payment.date)}</span>
@@ -1241,6 +1464,119 @@ export default function CreditSalesDashboard() {
           </div>
         </div>
       )}
+
+      {/* MODAL DE IMPRESSÃO - PREVIEW IMPRESSORA ELGIN I9 (40 COLUNAS) */}
+      {printModal && (
+        <div style={{
+          position: "fixed",
+          inset: 0,
+          zIndex: 99999,
+          background: "rgba(0, 0, 0, 0.85)",
+          backdropFilter: "blur(10px)",
+          WebkitBackdropFilter: "blur(10px)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "1rem"
+        }}>
+          <div style={{
+            background: "var(--surface-mid)",
+            border: "1px solid var(--glass-border)",
+            borderRadius: "16px",
+            width: "100%",
+            maxWidth: "460px",
+            padding: "1.5rem",
+            boxShadow: "0 20px 50px rgba(0,0,0,0.8)",
+            display: "flex",
+            flexDirection: "column",
+            gap: "1.2rem",
+            maxHeight: "90vh"
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <h3 style={{ fontSize: "14px", color: "var(--primary)", display: "flex", alignItems: "center", gap: "8px", margin: 0 }}>
+                <Printer size={18} /> {printModal.title}
+              </h3>
+              <button 
+                onClick={() => setPrintModal(null)}
+                style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer" }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <p style={{ fontSize: "11px", color: "var(--text-muted)", margin: 0 }}>
+              Pré-visualização ajustada para papel 80mm Elgin i9 (40 colunas):
+            </p>
+
+            {/* Container do Cupom Térmico impresso */}
+            <div 
+              id="elgin-i9-print-area"
+              style={{
+                background: "#ffffff",
+                color: "#000000",
+                padding: "1rem",
+                borderRadius: "8px",
+                fontFamily: "'Courier New', Courier, monospace",
+                fontSize: "12px",
+                lineHeight: "1.25",
+                whiteSpace: "pre",
+                overflowX: "auto",
+                maxHeight: "50vh",
+                border: "1px dashed #ccc"
+              }}
+            >
+              {printModal.lines.join("\n")}
+            </div>
+
+            <div style={{ display: "flex", gap: "10px", marginTop: "0.5rem" }}>
+              <button 
+                onClick={() => setPrintModal(null)}
+                className="btn-outline"
+                style={{ flex: 1, padding: "0.7rem", fontSize: "12px" }}
+              >
+                Fechar
+              </button>
+              <button 
+                onClick={() => window.print()}
+                className="btn-main"
+                style={{ flex: 2, padding: "0.7rem", fontSize: "12px", gap: "8px", display: "flex", alignItems: "center", justifyContent: "center" }}
+              >
+                <Printer size={16} /> Imprimir na Elgin i9
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Regras CSS para Impressão Térmica Direta (Elgin i9 80mm) */}
+      <style jsx global>{`
+        @media print {
+          body * {
+            visibility: hidden !important;
+          }
+          #elgin-i9-print-area, #elgin-i9-print-area * {
+            visibility: visible !important;
+          }
+          #elgin-i9-print-area {
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 78mm !important;
+            margin: 0 !important;
+            padding: 2mm !important;
+            font-family: 'Courier New', Courier, monospace !important;
+            font-size: 11px !important;
+            line-height: 1.2 !important;
+            color: #000000 !important;
+            background: #ffffff !important;
+            border: none !important;
+            box-shadow: none !important;
+            white-space: pre-wrap !important;
+            max-height: none !important;
+            overflow: visible !important;
+          }
+        }
+      `}</style>
 
     </div>
   );
