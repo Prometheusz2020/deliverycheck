@@ -291,6 +291,65 @@ export default function CreditSalesDashboard() {
     });
   };
 
+  // Função para disparar a impressão limpa na Elgin i9 via Iframe Isolado (80mm / 40 colunas)
+  const executeThermalPrint = (lines: string[]) => {
+    const textContent = lines.join("\n");
+
+    const iframe = document.createElement("iframe");
+    iframe.style.position = "fixed";
+    iframe.style.right = "0";
+    iframe.style.bottom = "0";
+    iframe.style.width = "0";
+    iframe.style.height = "0";
+    iframe.style.border = "0";
+    document.body.appendChild(iframe);
+
+    const doc = iframe.contentWindow?.document;
+    if (doc) {
+      doc.open();
+      doc.write(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <meta charset="utf-8" />
+            <title>Cupom Elgin i9</title>
+            <style>
+              @page {
+                size: 80mm auto;
+                margin: 0mm !important;
+              }
+              html, body {
+                width: 72mm !important;
+                max-width: 72mm !important;
+                margin: 0 !important;
+                padding: 1mm 0 0 0 !important;
+                background: #ffffff !important;
+                color: #000000 !important;
+                font-family: 'Courier New', Courier, monospace !important;
+                font-size: 11px !important;
+                line-height: 1.25 !important;
+                white-space: pre-wrap !important;
+                word-break: break-all !important;
+              }
+            </style>
+          </head>
+          <body>${textContent}</body>
+        </html>
+      `);
+      doc.close();
+
+      setTimeout(() => {
+        iframe.contentWindow?.focus();
+        iframe.contentWindow?.print();
+        setTimeout(() => {
+          if (document.body.contains(iframe)) {
+            document.body.removeChild(iframe);
+          }
+        }, 1500);
+      }, 300);
+    }
+  };
+
   // Carregar as vendas recentes across todos os clientes
   const fetchRecentSales = useCallback(async () => {
     try {
@@ -1537,7 +1596,7 @@ export default function CreditSalesDashboard() {
                 Fechar
               </button>
               <button 
-                onClick={() => window.print()}
+                onClick={() => executeThermalPrint(printModal.lines)}
                 className="btn-main"
                 style={{ flex: 2, padding: "0.7rem", fontSize: "12px", gap: "8px", display: "flex", alignItems: "center", justifyContent: "center" }}
               >
