@@ -112,15 +112,15 @@ export default function CreditSalesDashboard() {
     lines: string[];
   } | null>(null);
 
-  // Auxiliares para formatação de 40 colunas em impressora térmica (Elgin i9)
-  const format40Line = (left: string = "", right: string = "", width: number = 40): string => {
+  // Auxiliares para formatação de 37 colunas em impressora térmica (Elgin i9)
+  const format40Line = (left: string = "", right: string = "", width: number = 37): string => {
     const maxLeftLen = width - right.length - 1;
     const leftClean = left.length > maxLeftLen ? left.substring(0, maxLeftLen) : left;
     const spaces = Math.max(1, width - leftClean.length - right.length);
     return leftClean + " ".repeat(spaces) + right;
   };
 
-  const padCenter = (text: string, width: number = 40): string => {
+  const padCenter = (text: string, width: number = 37): string => {
     const clean = text.substring(0, width);
     const leftPadding = Math.max(0, Math.floor((width - clean.length) / 2));
     return " ".repeat(leftPadding) + clean;
@@ -133,13 +133,13 @@ export default function CreditSalesDashboard() {
     const debtors = customers.filter(c => c.balance > 0);
 
     const lines: string[] = [
-      "========================================",
+      "===================================",
       padCenter("DELIVERY CHECK / GPLUS"),
       padCenter("RELATORIO GERAL DE DEVEDORES"),
       `Data/Hora: ${nowStr}`,
-      "========================================",
+      "===================================",
       format40Line("CLIENTE", "SALDO DEVEDOR"),
-      "----------------------------------------"
+      "-----------------------------------"
     ];
 
     if (debtors.length === 0) {
@@ -151,11 +151,11 @@ export default function CreditSalesDashboard() {
       });
     }
 
-    lines.push("----------------------------------------");
+    lines.push("-----------------------------------");
     lines.push(format40Line(`TOTAL DEVEDORES: ${debtors.length}`, ""));
     lines.push(format40Line("TOTAL DA CARTEIRA:", `R$ ${totalDebt.toFixed(2)}`));
-    lines.push("========================================");
-    lines.push(padCenter("IMPRESSORA ELGIN I9 (40 COL)"));
+    lines.push("===================================");
+    lines.push(padCenter("IMPRESSORA ELGIN I9 (37 COL)"));
     lines.push("\n\n\n");
 
     setPrintModal({
@@ -170,11 +170,11 @@ export default function CreditSalesDashboard() {
     const nowStr = new Date().toLocaleString('pt-BR');
 
     const lines: string[] = [
-      "========================================",
+      "===================================",
       padCenter("DELIVERY CHECK / GPLUS"),
       padCenter("EXTRATO DE CONTA FIADO"),
       `Data/Hora: ${nowStr}`,
-      "========================================",
+      "===================================",
       `CLIENTE: ${customerDetails.name.toUpperCase()}`,
     ];
 
@@ -182,7 +182,7 @@ export default function CreditSalesDashboard() {
     if (customerDetails.address) lines.push(`END: ${customerDetails.address}`);
     if (customerDetails.bestPaymentDay) lines.push(`MELHOR DIA PGTO: DIA ${customerDetails.bestPaymentDay}`);
 
-    lines.push("----------------------------------------");
+    lines.push("-----------------------------------");
     lines.push("HISTORICO DE COMPRAS (FIADO):");
     if (processedData.allocatedSales.length === 0) {
       lines.push("  (Nenhuma compra registrada)");
@@ -191,12 +191,12 @@ export default function CreditSalesDashboard() {
         const dateStr = formatDate(s.date);
         lines.push(format40Line(`${dateStr} Comanda`, `R$ ${s.totalAmount.toFixed(2)}`));
         s.items.forEach(item => {
-          lines.push(`  ${item.quantity}x ${item.description.substring(0, 22)}`);
+          lines.push(`  ${item.quantity}x ${item.description.substring(0, 19)}`);
         });
       });
     }
 
-    lines.push("----------------------------------------");
+    lines.push("-----------------------------------");
     lines.push("HISTORICO DE PAGAMENTOS:");
     if (customerDetails.payments.length === 0) {
       lines.push("  (Nenhum pagamento efetuado)");
@@ -207,14 +207,14 @@ export default function CreditSalesDashboard() {
       });
     }
 
-    lines.push("----------------------------------------");
+    lines.push("-----------------------------------");
     lines.push(format40Line("TOTAL COMPRAS:", `R$ ${customerDetails.totalSales.toFixed(2)}`));
     lines.push(format40Line("TOTAL PAGOS:", `R$ ${customerDetails.totalPayments.toFixed(2)}`));
-    lines.push("========================================");
+    lines.push("===================================");
     lines.push(format40Line("SALDO DEVEDOR ATUAL:", `R$ ${customerDetails.balance.toFixed(2)}`));
-    lines.push("========================================");
+    lines.push("===================================");
     lines.push("\nAssinatura do Cliente:\n\n");
-    lines.push("________________________________________");
+    lines.push("___________________________________");
     lines.push(padCenter(customerDetails.name.toUpperCase()));
     lines.push("\n\n\n");
 
@@ -230,28 +230,28 @@ export default function CreditSalesDashboard() {
     const dateStr = formatDate(sale.date);
 
     const lines: string[] = [
-      "========================================",
+      "===================================",
       padCenter("DELIVERY CHECK / GPLUS"),
       padCenter("COMPROVANTE DE VENDA FIADO"),
       `Data: ${dateStr}`,
-      "========================================",
+      "===================================",
       `CLIENTE: ${custName.toUpperCase()}`,
       sale.gplusId ? `REF GPLUS: #${sale.gplusId}` : "",
-      "----------------------------------------",
+      "-----------------------------------",
       format40Line("QTD ITEM", "TOTAL (R$)"),
-      "----------------------------------------"
+      "-----------------------------------"
     ].filter(Boolean);
 
     sale.items.forEach(item => {
       lines.push(format40Line(`${item.quantity}x ${item.description}`, `R$ ${item.totalPrice.toFixed(2)}`));
     });
 
-    lines.push("----------------------------------------");
+    lines.push("-----------------------------------");
     lines.push(format40Line("VALOR TOTAL:", `R$ ${sale.totalAmount.toFixed(2)}`));
-    lines.push("----------------------------------------");
+    lines.push("-----------------------------------");
     lines.push("Reconheco e pagarei a divida acima.");
     lines.push("\nAssinatura do Cliente:\n\n");
-    lines.push("________________________________________");
+    lines.push("___________________________________");
     lines.push(padCenter(custName.toUpperCase()));
     lines.push("\n\n\n");
 
@@ -267,20 +267,20 @@ export default function CreditSalesDashboard() {
     const dateStr = formatDate(payment.date);
 
     const lines: string[] = [
-      "========================================",
+      "===================================",
       padCenter("DELIVERY CHECK / GPLUS"),
       padCenter("RECIBO DE PAGAMENTO FIADO"),
       `Data: ${dateStr}`,
-      "========================================",
+      "===================================",
       `CLIENTE: ${custName.toUpperCase()}`,
       `FORMA PGTO: ${payment.paymentMethod}`,
-      "----------------------------------------",
+      "-----------------------------------",
       format40Line("VALOR RECEBIDO:", `R$ ${payment.amount.toFixed(2)}`),
-      "----------------------------------------",
+      "-----------------------------------",
       format40Line("SALDO RESTANTE:", `R$ ${customerDetails?.balance.toFixed(2) || "0.00"}`),
-      "========================================",
+      "===================================",
       "\nRecebido por:\n\n",
-      "________________________________________",
+      "___________________________________",
       padCenter("ESTABELECIMENTO"),
       "\n\n\n"
     ];
@@ -752,9 +752,9 @@ export default function CreditSalesDashboard() {
               onClick={handlePrintGeneralReport}
               className="btn-outline" 
               style={{ padding: '0.5rem 1rem', fontSize: '11px', borderRadius: '10px', height: '38px', gap: '6px', display: 'flex', alignItems: 'center' }}
-              title="Imprimir Relatório de Todos os Devedores (Elgin i9 40 Colunas)"
+              title="Imprimir Relatório de Todos os Devedores (Elgin i9 37 Colunas)"
             >
-              <Printer size={14} /> Relatório Geral (40 col)
+              <Printer size={14} /> Relatório Geral (37 col)
             </button>
             <button 
               onClick={() => {
@@ -1573,7 +1573,7 @@ export default function CreditSalesDashboard() {
             </div>
 
             <p style={{ fontSize: "11px", color: "var(--text-muted)", margin: 0 }}>
-              Pré-visualização ajustada para papel 80mm Elgin i9 (40 colunas):
+              Pré-visualização ajustada para papel 80mm Elgin i9 (37 colunas):
             </p>
 
             {/* Container do Cupom Térmico impresso */}
