@@ -325,11 +325,20 @@ export default function CreditSalesDashboard() {
                 padding: 1mm 0 0 0 !important;
                 background: #ffffff !important;
                 color: #000000 !important;
-                font-family: 'Courier New', Courier, monospace !important;
-                font-size: 11px !important;
-                line-height: 1.25 !important;
+                font-family: Consolas, Monaco, 'Courier New', Courier, monospace !important;
+                font-size: 12px !important;
+                font-weight: 700 !important;
+                line-height: 1.3 !important;
                 white-space: pre-wrap !important;
                 word-break: break-all !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+                -webkit-font-smoothing: antialiased !important;
+                -webkit-text-stroke: 0.25px #000000 !important;
+              }
+              * {
+                color: #000000 !important;
+                font-weight: 700 !important;
               }
             </style>
           </head>
@@ -1575,13 +1584,15 @@ export default function CreditSalesDashboard() {
                 color: "#000000",
                 padding: "1rem",
                 borderRadius: "8px",
-                fontFamily: "'Courier New', Courier, monospace",
+                fontFamily: "Consolas, Monaco, 'Courier New', Courier, monospace",
                 fontSize: "12px",
-                lineHeight: "1.25",
+                fontWeight: 700,
+                lineHeight: "1.3",
                 whiteSpace: "pre",
                 overflowX: "auto",
                 maxHeight: "50vh",
-                border: "1px dashed #ccc"
+                border: "1px dashed #ccc",
+                WebkitTextStroke: "0.25px #000000"
               }}
             >
               {printModal.lines.join("\n")}
@@ -1623,9 +1634,10 @@ export default function CreditSalesDashboard() {
             width: 78mm !important;
             margin: 0 !important;
             padding: 2mm !important;
-            font-family: 'Courier New', Courier, monospace !important;
-            font-size: 11px !important;
-            line-height: 1.2 !important;
+            font-family: Consolas, Monaco, 'Courier New', Courier, monospace !important;
+            font-size: 12px !important;
+            font-weight: 700 !important;
+            line-height: 1.3 !important;
             color: #000000 !important;
             background: #ffffff !important;
             border: none !important;
@@ -1633,6 +1645,9 @@ export default function CreditSalesDashboard() {
             white-space: pre-wrap !important;
             max-height: none !important;
             overflow: visible !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+            -webkit-text-stroke: 0.25px #000000 !important;
           }
         }
       `}</style>
