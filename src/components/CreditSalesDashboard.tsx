@@ -105,6 +105,43 @@ export default function CreditSalesDashboard() {
   const [payNotes, setPayNotes] = useState("");
   const [isSubmittingPayment, setIsSubmittingPayment] = useState(false);
   const [recentSales, setRecentSales] = useState<any[]>([]);
+  
+  // Filtros de Data para Fiado (Hoje / Ontem / Todos)
+  const [recentSalesFilter, setRecentSalesFilter] = useState<'hoje' | 'ontem' | 'todos'>('hoje');
+  const [customerSalesFilter, setCustomerSalesFilter] = useState<'hoje' | 'ontem' | 'todos'>('todos');
+
+  // Auxiliares para filtro por data local
+  const isSameDay = useCallback((dateInput: Date | string, targetDate: Date) => {
+    const d = new Date(dateInput);
+    return (
+      d.getFullYear() === targetDate.getFullYear() &&
+      d.getMonth() === targetDate.getMonth() &&
+      d.getDate() === targetDate.getDate()
+    );
+  }, []);
+
+  const getYesterdayDate = useCallback(() => {
+    const y = new Date();
+    y.setDate(y.getDate() - 1);
+    return y;
+  }, []);
+
+  // Vendas de Fiado Recentes Filtradas + Subtotal
+  const filteredRecentSales = useMemo(() => {
+    if (recentSalesFilter === 'hoje') {
+      const today = new Date();
+      return recentSales.filter(s => isSameDay(s.date, today));
+    }
+    if (recentSalesFilter === 'ontem') {
+      const yesterday = getYesterdayDate();
+      return recentSales.filter(s => isSameDay(s.date, yesterday));
+    }
+    return recentSales;
+  }, [recentSales, recentSalesFilter, isSameDay, getYesterdayDate]);
+
+  const recentSalesSubtotal = useMemo(() => {
+    return filteredRecentSales.reduce((acc, s) => acc + (s.totalAmount || 0), 0);
+  }, [filteredRecentSales]);
 
   // Estado para Modal de Impressão Elgin i9 (40 colunas)
   const [printModal, setPrintModal] = useState<{
@@ -449,6 +486,24 @@ export default function CreditSalesDashboard() {
     return { allocatedSales, monthlyBreakdown };
   }, [customerDetails]);
 
+  // Histórico de Compras do Cliente Filtrado por Data + Subtotal
+  const filteredCustomerSales = useMemo(() => {
+    if (!processedData.allocatedSales) return [];
+    if (customerSalesFilter === 'hoje') {
+      const today = new Date();
+      return processedData.allocatedSales.filter(s => isSameDay(s.date, today));
+    }
+    if (customerSalesFilter === 'ontem') {
+      const yesterday = getYesterdayDate();
+      return processedData.allocatedSales.filter(s => isSameDay(s.date, yesterday));
+    }
+    return processedData.allocatedSales;
+  }, [processedData.allocatedSales, customerSalesFilter, isSameDay, getYesterdayDate]);
+
+  const customerSalesSubtotal = useMemo(() => {
+    return filteredCustomerSales.reduce((acc, s) => acc + (s.totalAmount || 0), 0);
+  }, [filteredCustomerSales]);
+
   // Carregar lista de clientes
   const fetchCustomers = useCallback(async () => {
     setIsLoading(true);
@@ -782,49 +837,103 @@ export default function CreditSalesDashboard() {
           
           {/* ÚLTIMOS LANÇAMENTOS FIADO */}
           {recentSales.length > 0 && (
-            <div className="card-premium" style={{ padding: '1.2rem' }}>
-              <h3 style={{ fontSize: '11px', color: 'var(--primary)', fontWeight: 900, textTransform: 'uppercase', marginBottom: '10px', letterSpacing: '0.05em' }}>
-                Últimos Pedidos Fiados Feitos
-              </h3>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '12px' }}>
-                {recentSales.map((sale) => (
-                  <div 
-                    key={sale.id} 
-                    onClick={() => {
-                      setSelectedCustomerId(sale.customerId);
-                    }}
-                    style={{ 
-                      background: 'rgba(255,255,255,0.01)', 
-                      border: '1px solid rgba(255,255,255,0.04)', 
-                      padding: '10px 12px', 
-                      borderRadius: '8px',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s ease',
-                      borderLeft: '3px solid var(--primary)'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = 'rgba(255,255,255,0.03)';
-                      e.currentTarget.style.borderColor = 'var(--primary)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = 'rgba(255,255,255,0.01)';
-                      e.currentTarget.style.borderColor = 'rgba(255,255,255,0.04)';
-                    }}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '4px' }}>
-                      <span style={{ fontSize: '12px', fontWeight: 800, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '110px' }} title={sale.customerName}>
-                        {sale.customerName}
-                      </span>
-                      <span style={{ fontSize: '11px', fontWeight: 800, color: 'var(--danger)' }}>
-                        R$ {sale.totalAmount.toFixed(2)}
-                      </span>
+            <div className="card-premium" style={{ padding: '1.2rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                <h3 style={{ fontSize: '11px', color: 'var(--primary)', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.05em', margin: 0 }}>
+                  Lançamentos Fiado ({filteredRecentSales.length})
+                </h3>
+                
+                {/* FILTRO DE DATAS (HOJE, ONTEM, TODOS) */}
+                <div style={{ display: 'flex', gap: '4px', background: 'rgba(0,0,0,0.4)', padding: '3px 4px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.08)' }}>
+                  {(['hoje', 'ontem', 'todos'] as const).map((filter) => {
+                    const isActive = recentSalesFilter === filter;
+                    const label = filter === 'hoje' ? 'Hoje' : filter === 'ontem' ? 'Ontem' : 'Todos';
+                    return (
+                      <button
+                        key={filter}
+                        onClick={() => setRecentSalesFilter(filter)}
+                        style={{
+                          padding: '0.3rem 0.8rem',
+                          fontSize: '11px',
+                          borderRadius: '6px',
+                          border: 'none',
+                          cursor: 'pointer',
+                          fontWeight: isActive ? 800 : 600,
+                          background: isActive ? 'var(--primary)' : 'transparent',
+                          color: isActive ? '#000' : 'var(--text-muted)',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {filteredRecentSales.length === 0 ? (
+                <p style={{ color: 'var(--text-muted)', fontSize: '12px', fontStyle: 'italic', padding: '0.8rem 0', margin: 0 }}>
+                  Nenhum pedido fiado encontrado para {recentSalesFilter === 'hoje' ? 'hoje' : recentSalesFilter === 'ontem' ? 'ontem' : 'este filtro'}.
+                </p>
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '12px', maxHeight: '220px', overflowY: 'auto', paddingRight: '4px' }}>
+                  {filteredRecentSales.map((sale) => (
+                    <div 
+                      key={sale.id} 
+                      onClick={() => {
+                        setSelectedCustomerId(sale.customerId);
+                      }}
+                      style={{ 
+                        background: 'rgba(255,255,255,0.01)', 
+                        border: '1px solid rgba(255,255,255,0.04)', 
+                        padding: '10px 12px', 
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                        borderLeft: '3px solid var(--primary)'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = 'rgba(255,255,255,0.03)';
+                        e.currentTarget.style.borderColor = 'var(--primary)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'rgba(255,255,255,0.01)';
+                        e.currentTarget.style.borderColor = 'rgba(255,255,255,0.04)';
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '4px' }}>
+                        <span style={{ fontSize: '12px', fontWeight: 800, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '110px' }} title={sale.customerName}>
+                          {sale.customerName}
+                        </span>
+                        <span style={{ fontSize: '11px', fontWeight: 800, color: 'var(--danger)' }}>
+                          R$ {sale.totalAmount.toFixed(2)}
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px', color: 'var(--text-muted)' }}>
+                        <span>Comanda #{sale.orderNumber}</span>
+                        <span>{new Date(sale.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}</span>
+                      </div>
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px', color: 'var(--text-muted)' }}>
-                      <span>Comanda #{sale.orderNumber}</span>
-                      <span>{new Date(sale.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}</span>
-                    </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
+              )}
+
+              {/* SUBTOTAL EM BAIXO DA LISTA */}
+              <div style={{ 
+                padding: '10px 14px', 
+                background: 'rgba(0, 242, 255, 0.04)', 
+                border: '1px solid rgba(0, 242, 255, 0.18)', 
+                borderRadius: '8px', 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'center' 
+              }}>
+                <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Subtotal ({recentSalesFilter === 'hoje' ? 'Hoje' : recentSalesFilter === 'ontem' ? 'Ontem' : 'Todos'} - {filteredRecentSales.length} {filteredRecentSales.length === 1 ? 'lançamento' : 'lançamentos'}):
+                </span>
+                <span style={{ fontSize: '15px', fontWeight: 900, color: 'var(--primary)' }}>
+                  R$ {recentSalesSubtotal.toFixed(2)}
+                </span>
               </div>
             </div>
           )}
@@ -1099,16 +1208,46 @@ export default function CreditSalesDashboard() {
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
                     
                     {/* COLUNA COMPRAS */}
-                    <div>
-                      <h3 style={{ fontSize: '12px', color: 'var(--primary)', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <Clock size={14} /> HISTÓRICO DE COMPRAS (FIADO)
-                      </h3>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
+                        <h3 style={{ fontSize: '12px', color: 'var(--primary)', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <Clock size={14} /> HISTÓRICO DE COMPRAS (FIADO)
+                        </h3>
 
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '400px', overflowY: 'auto' }}>
-                        {processedData.allocatedSales.length === 0 ? (
-                          <p style={{ color: 'var(--text-muted)', fontSize: '11px', fontStyle: 'italic' }}>Nenhuma compra fiado registrada.</p>
+                        {/* Filtro de datas para histórico do cliente */}
+                        <div style={{ display: 'flex', gap: '3px', background: 'rgba(0,0,0,0.3)', padding: '2px 4px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                          {(['hoje', 'ontem', 'todos'] as const).map((filter) => {
+                            const isActive = customerSalesFilter === filter;
+                            const label = filter === 'hoje' ? 'Hoje' : filter === 'ontem' ? 'Ontem' : 'Todos';
+                            return (
+                              <button
+                                key={filter}
+                                onClick={() => setCustomerSalesFilter(filter)}
+                                style={{
+                                  padding: '2px 6px',
+                                  fontSize: '10px',
+                                  borderRadius: '4px',
+                                  border: 'none',
+                                  cursor: 'pointer',
+                                  fontWeight: isActive ? 800 : 500,
+                                  background: isActive ? 'var(--primary)' : 'transparent',
+                                  color: isActive ? '#000' : 'var(--text-muted)'
+                                }}
+                              >
+                                {label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '380px', overflowY: 'auto' }}>
+                        {filteredCustomerSales.length === 0 ? (
+                          <p style={{ color: 'var(--text-muted)', fontSize: '11px', fontStyle: 'italic', margin: 0 }}>
+                            Nenhuma compra fiado registrada {customerSalesFilter === 'hoje' ? 'hoje' : customerSalesFilter === 'ontem' ? 'ontem' : ''}.
+                          </p>
                         ) : (
-                          processedData.allocatedSales.map(sale => (
+                          filteredCustomerSales.map(sale => (
                             <div key={sale.id} style={{ background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.04)', padding: '10px 12px', borderRadius: '8px', position: 'relative' }}>
                               <div style={{ position: 'absolute', top: '8px', right: '8px', display: 'flex', gap: '6px' }}>
                                 <button 
@@ -1183,6 +1322,24 @@ export default function CreditSalesDashboard() {
                             </div>
                           ))
                         )}
+                      </div>
+
+                      {/* Subtotal do filtro de compras do cliente */}
+                      <div style={{ 
+                        padding: '8px 12px', 
+                        background: 'rgba(255, 45, 85, 0.05)', 
+                        border: '1px solid rgba(255, 45, 85, 0.18)', 
+                        borderRadius: '8px', 
+                        display: 'flex', 
+                        justifyContent: 'space-between', 
+                        alignItems: 'center' 
+                      }}>
+                        <span style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                          Subtotal Compras ({customerSalesFilter === 'hoje' ? 'Hoje' : customerSalesFilter === 'ontem' ? 'Ontem' : 'Todos'} - {filteredCustomerSales.length}):
+                        </span>
+                        <span style={{ fontSize: '13px', fontWeight: 900, color: 'var(--danger)' }}>
+                          R$ {customerSalesSubtotal.toFixed(2)}
+                        </span>
                       </div>
                     </div>
 

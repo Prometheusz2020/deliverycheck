@@ -270,7 +270,7 @@ export async function deletePayment(paymentId: string) {
   }
 }
 
-export async function getRecentCreditSales(limit: number = 6) {
+export async function getRecentCreditSales(limit: number = 100) {
   try {
     const sales = await prisma.creditSale.findMany({
       take: limit,
