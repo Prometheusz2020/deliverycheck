@@ -147,10 +147,17 @@ export default function CreditSalesDashboard() {
     return filteredRecentSales.reduce((acc, s) => acc + (s.totalAmount || 0), 0);
   }, [filteredRecentSales]);
 
+  // Opção para incluir ou ocultar comandas pagas no relatório de extrato
+  const [includePaidInPrint, setIncludePaidInPrint] = useState(false);
+  // Opção para filtrar lista de compras na tela (todas vs apenas em aberto)
+  const [salesFilterInUI, setSalesFilterInUI] = useState<'todas' | 'pendentes'>('todas');
+
   // Estado para Modal de Impressão Elgin i9 (40 colunas)
   const [printModal, setPrintModal] = useState<{
     title: string;
     lines: string[];
+    isCustomerLedger?: boolean;
+    includePaid?: boolean;
   } | null>(null);
 
   // Auxiliares para formatação de 37 colunas em impressora térmica (Elgin i9)
@@ -205,15 +212,21 @@ export default function CreditSalesDashboard() {
     });
   };
 
-  // 2. Extrato Completo do Cliente Selecionado
-  const handlePrintCustomerLedger = () => {
+  // 2. Extrato Completo ou Em Aberto do Cliente Selecionado
+  const handlePrintCustomerLedger = (overrideIncludePaid?: boolean) => {
     if (!customerDetails) return;
+    const showPaid = overrideIncludePaid !== undefined ? overrideIncludePaid : includePaidInPrint;
     const nowStr = new Date().toLocaleString('pt-BR');
+
+    // Filtrar comandas: se showPaid for falso, oculta comandas totalmente pagas
+    const salesToPrint = showPaid 
+      ? processedData.allocatedSales 
+      : processedData.allocatedSales.filter(s => s.allocationStatus !== 'PAGO');
 
     const lines: string[] = [
       "===================================",
       padCenter("DELIVERY CHECK / GPLUS"),
-      padCenter("EXTRATO DE CONTA FIADO"),
+      padCenter(showPaid ? "EXTRATO COMPLETO FIADO" : "EXTRATO DE FIADO (EM ABERTO)"),
       `Data/Hora: ${nowStr}`,
       "===================================",
       `CLIENTE: ${customerDetails.name.toUpperCase()}`,
@@ -224,13 +237,17 @@ export default function CreditSalesDashboard() {
     if (customerDetails.bestPaymentDay) lines.push(`MELHOR DIA PGTO: DIA ${customerDetails.bestPaymentDay}`);
 
     lines.push("-----------------------------------");
-    lines.push("HISTORICO DE COMPRAS (FIADO):");
-    if (processedData.allocatedSales.length === 0) {
-      lines.push("  (Nenhuma compra registrada)");
+    lines.push(showPaid ? "HISTORICO DE COMPRAS (TODAS):" : "COMPRAS EM ABERTO (PENDENTES):");
+    if (salesToPrint.length === 0) {
+      lines.push(showPaid ? "  (Nenhuma compra registrada)" : "  (Nenhuma comanda em aberto)");
     } else {
-      processedData.allocatedSales.forEach(s => {
+      salesToPrint.forEach(s => {
         const dateStr = formatDate(s.date);
-        lines.push(format40Line(`${dateStr} Comanda`, `R$ ${s.totalAmount.toFixed(2)}`));
+        const statusTag = s.allocationStatus === 'PAGO' ? " (PAGO)" : s.allocationStatus === 'PARCIAL' ? " (PARCIAL)" : "";
+        lines.push(format40Line(`${dateStr} Comanda${statusTag}`, `R$ ${s.totalAmount.toFixed(2)}`));
+        if (s.allocationStatus === 'PARCIAL') {
+          lines.push(`  [Pago: R$ ${s.paidAmount.toFixed(2)} | Resta: R$ ${s.remainingAmount.toFixed(2)}]`);
+        }
         s.items.forEach(item => {
           lines.push(`  ${item.quantity}x ${item.description.substring(0, 19)}`);
         });
@@ -260,8 +277,10 @@ export default function CreditSalesDashboard() {
     lines.push("\n\n\n");
 
     setPrintModal({
-      title: `Extrato de Fiado - ${customerDetails.name}`,
-      lines
+      title: showPaid ? `Extrato Completo - ${customerDetails.name}` : `Extrato Em Aberto - ${customerDetails.name}`,
+      lines,
+      isCustomerLedger: true,
+      includePaid: showPaid
     });
   };
 
@@ -1195,14 +1214,25 @@ export default function CreditSalesDashboard() {
                     {/* Bloco de saldos */}
                     <div style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.05)', padding: '1rem 1.5rem', borderRadius: '12px', textAlign: 'right' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px', gap: '12px' }}>
-                        <button 
-                          onClick={handlePrintCustomerLedger}
-                          className="btn-outline"
-                          style={{ padding: '0.3rem 0.6rem', fontSize: '10px', gap: '4px', display: 'flex', alignItems: 'center' }}
-                          title="Imprimir Extrato Completo do Cliente na Elgin i9 (40 colunas)"
-                        >
-                          <Printer size={12} /> Imprimir Extrato
-                        </button>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <button 
+                            onClick={() => handlePrintCustomerLedger(includePaidInPrint)}
+                            className="btn-outline"
+                            style={{ padding: '0.3rem 0.6rem', fontSize: '10px', gap: '4px', display: 'flex', alignItems: 'center' }}
+                            title="Imprimir Extrato do Cliente na Elgin i9 (40 colunas)"
+                          >
+                            <Printer size={12} /> Imprimir Extrato
+                          </button>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px', color: 'var(--text-muted)', cursor: 'pointer', userSelect: 'none' }}>
+                            <input 
+                              type="checkbox"
+                              checked={includePaidInPrint}
+                              onChange={(e) => setIncludePaidInPrint(e.target.checked)}
+                              style={{ cursor: 'pointer', accentColor: 'var(--primary)' }}
+                            />
+                            Incluir pagas
+                          </label>
+                        </div>
                         <p style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: 900, textTransform: 'uppercase', margin: 0 }}>Saldo Devedor Atual</p>
                       </div>
                       <h3 style={{ fontSize: '2rem', fontStyle: 'normal', color: customerDetails.balance > 0 ? 'var(--danger)' : 'var(--success)' }}>
@@ -1253,15 +1283,53 @@ export default function CreditSalesDashboard() {
                     
                     {/* COLUNA COMPRAS */}
                     <div>
-                      <h3 style={{ fontSize: '12px', color: 'var(--primary)', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <Clock size={14} /> HISTÓRICO DE COMPRAS (FIADO)
-                      </h3>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                        <h3 style={{ fontSize: '12px', color: 'var(--primary)', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <Clock size={14} /> HISTÓRICO DE COMPRAS (FIADO)
+                        </h3>
+                        <div style={{ display: 'flex', gap: '4px', background: 'rgba(0,0,0,0.3)', padding: '2px 4px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                          <button
+                            type="button"
+                            onClick={() => setSalesFilterInUI('todas')}
+                            style={{
+                              padding: '2px 8px',
+                              fontSize: '9px',
+                              borderRadius: '4px',
+                              border: 'none',
+                              cursor: 'pointer',
+                              background: salesFilterInUI === 'todas' ? 'var(--primary)' : 'transparent',
+                              color: salesFilterInUI === 'todas' ? '#000' : 'var(--text-muted)',
+                              fontWeight: 800
+                            }}
+                          >
+                            Todas
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setSalesFilterInUI('pendentes')}
+                            style={{
+                              padding: '2px 8px',
+                              fontSize: '9px',
+                              borderRadius: '4px',
+                              border: 'none',
+                              cursor: 'pointer',
+                              background: salesFilterInUI === 'pendentes' ? 'var(--primary)' : 'transparent',
+                              color: salesFilterInUI === 'pendentes' ? '#000' : 'var(--text-muted)',
+                              fontWeight: 800
+                            }}
+                          >
+                            Em Aberto
+                          </button>
+                        </div>
+                      </div>
 
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '400px', overflowY: 'auto' }}>
-                        {processedData.allocatedSales.length === 0 ? (
-                          <p style={{ color: 'var(--text-muted)', fontSize: '11px', fontStyle: 'italic' }}>Nenhuma compra fiado registrada.</p>
+                        {processedData.allocatedSales.filter(s => salesFilterInUI === 'todas' || s.allocationStatus !== 'PAGO').length === 0 ? (
+                          <p style={{ color: 'var(--text-muted)', fontSize: '11px', fontStyle: 'italic' }}>
+                            {salesFilterInUI === 'pendentes' ? 'Nenhuma compra em aberto pendente.' : 'Nenhuma compra fiado registrada.'}
+                          </p>
                         ) : (
-                          processedData.allocatedSales.map(sale => (
+                          processedData.allocatedSales.filter(s => salesFilterInUI === 'todas' || s.allocationStatus !== 'PAGO').map(sale => (
                             <div key={sale.id} style={{ background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.04)', padding: '10px 12px', borderRadius: '8px', position: 'relative' }}>
                               <div style={{ position: 'absolute', top: '8px', right: '8px', display: 'flex', gap: '6px' }}>
                                 <button 
@@ -1728,6 +1796,58 @@ export default function CreditSalesDashboard() {
             <p style={{ fontSize: "11px", color: "var(--text-muted)", margin: 0 }}>
               Pré-visualização ajustada para papel 80mm Elgin i9 (37 colunas):
             </p>
+
+            {/* SE FOR EXTRATO DO CLIENTE: CONTROLE DE FILTRO DE COMANDAS PAGAS */}
+            {printModal.isCustomerLedger && (
+              <div style={{ 
+                display: "flex", 
+                gap: "8px", 
+                alignItems: "center", 
+                justifyContent: "space-between",
+                background: "rgba(0, 0, 0, 0.3)", 
+                padding: "8px 12px", 
+                borderRadius: "8px",
+                border: "1px solid rgba(255, 255, 255, 0.05)"
+              }}>
+                <span style={{ fontSize: "11px", color: "var(--text-muted)", fontWeight: 600 }}>Imprimir comandas:</span>
+                <div style={{ display: "flex", gap: "6px" }}>
+                  <button
+                    type="button"
+                    onClick={() => handlePrintCustomerLedger(false)}
+                    style={{
+                      padding: "4px 10px",
+                      fontSize: "11px",
+                      borderRadius: "6px",
+                      border: "none",
+                      cursor: "pointer",
+                      background: !printModal.includePaid ? "var(--primary)" : "rgba(255,255,255,0.06)",
+                      color: !printModal.includePaid ? "#000" : "var(--text-muted)",
+                      fontWeight: 800,
+                      transition: "all 0.15s ease"
+                    }}
+                  >
+                    Apenas Em Aberto
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handlePrintCustomerLedger(true)}
+                    style={{
+                      padding: "4px 10px",
+                      fontSize: "11px",
+                      borderRadius: "6px",
+                      border: "none",
+                      cursor: "pointer",
+                      background: printModal.includePaid ? "var(--primary)" : "rgba(255,255,255,0.06)",
+                      color: printModal.includePaid ? "#000" : "var(--text-muted)",
+                      fontWeight: 800,
+                      transition: "all 0.15s ease"
+                    }}
+                  >
+                    Incluir Pagas (Total)
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Container do Cupom Térmico impresso */}
             <div 
