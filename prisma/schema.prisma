@@ -123,3 +123,13 @@ model ProdutoGPlus {
 
   @@map("produtos_gplus")
 }
+
+model SyncCommand {
+  id        String   @id @default(uuid())
+  status    String   @default("PENDING") // PENDING, PROCESSING, COMPLETED, FAILED
+  daysBack  Int      @default(7)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("sync_commands")
+}

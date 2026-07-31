@@ -23,6 +23,21 @@ const VERCEL_URL = process.env.VERCEL_URL || 'https://delivery-check-six.vercel.
 const SYNC_TOKEN = process.env.SYNC_TOKEN || 'ztilabs_sync_secret_2024';
 const POLLING_INTERVAL = parseInt(process.env.POLLING_INTERVAL || '30000'); // 30 segundos
 
+// Suporte a argumentos CLI (ex: node sync_local_gplus.js --full OU node sync_local_gplus.js --days 7)
+const args = process.argv.slice(2);
+const isFullSync = args.includes('--full') || args.includes('-f');
+const daysArgIndex = args.indexOf('--days');
+const customDays = daysArgIndex !== -1 && args[daysArgIndex + 1] ? parseInt(args[daysArgIndex + 1]) : null;
+const daysBack = customDays || (isFullSync ? 30 : 0);
+
+const getDateWhereClause = (overrideDays = null) => {
+    const effectiveDays = overrideDays !== null ? overrideDays : daysBack;
+    if (effectiveDays > 0) {
+        return `V.DATA_VENDA >= CURRENT_DATE - ${effectiveDays}`;
+    }
+    return `(V.DATA_VENDA = CURRENT_DATE OR V.DATA_HORA_ULTIMA_ALTERACAO >= CURRENT_TIMESTAMP - 1)`;
+};
+
 function hasValidAddress(logradouro) {
     if (!logradouro) return false;
     const clean = String(logradouro).trim().toLowerCase();
@@ -42,7 +57,7 @@ function hasValidAddress(logradouro) {
     return true;
 }
 
-async function syncAllOrdersFromToday() {
+async function syncAllOrdersFromToday(overrideDays = null) {
     console.log(`[${new Date().toLocaleTimeString()}] Iniciando verificação de novos pedidos...`);
     
     Firebird.attach(fbOptions, (err, db) => {
@@ -66,8 +81,7 @@ async function syncAllOrdersFromToday() {
             FROM ECF_VENDA_CABECALHO V
             LEFT JOIN ECF_VENDA_COMANDA C ON (C.ID_VENDA_CABECALHO = V.ID)
             LEFT JOIN ENDERECO E ON (E.ID = V.ID_ENDERECO)
-            WHERE V.DATA_VENDA >= CURRENT_DATE - 3
-               OR V.DATA_HORA_ULTIMA_ALTERACAO >= CURRENT_TIMESTAMP - 1
+            WHERE ${getDateWhereClause(overrideDays)}
         `;
 
         db.query(sql, async (err, result) => {
@@ -150,7 +164,7 @@ async function syncAllOrdersFromToday() {
     });
 }
 
-async function syncFiadoOrdersFromToday() {
+async function syncFiadoOrdersFromToday(overrideDays = null) {
     console.log(`[${new Date().toLocaleTimeString()}] Iniciando verificação de vendas a prazo (FIADO)...`);
     
     Firebird.attach(fbOptions, (err, db) => {
@@ -174,7 +188,7 @@ async function syncFiadoOrdersFromToday() {
             LEFT JOIN ECF_VENDA_COMANDA C ON (C.ID_VENDA_CABECALHO = V.ID)
             JOIN ECF_TOTAL_TIPO_PAGAMENTO P ON (P.ID_ECF_VENDA_CABECALHO = V.ID)
             JOIN ECF_TIPO_PAGAMENTO TP ON (TP.ID = P.ID_ECF_TIPO_PAGAMENTO)
-            WHERE (V.DATA_VENDA >= CURRENT_DATE - 7 OR V.DATA_HORA_ULTIMA_ALTERACAO >= CURRENT_TIMESTAMP - 2)
+            WHERE ${getDateWhereClause(overrideDays)}
               AND COALESCE(P.EXCLUIDO, 'N') <> 'S'
         `;
 
@@ -188,7 +202,7 @@ async function syncFiadoOrdersFromToday() {
             FROM ECF_VENDA_DETALHE D
             LEFT JOIN PRODUTO P ON (P.ID = D.ID_ECF_PRODUTO)
             JOIN ECF_VENDA_CABECALHO V ON (V.ID = D.ID_ECF_VENDA_CABECALHO)
-            WHERE (V.DATA_VENDA >= CURRENT_DATE - 7 OR V.DATA_HORA_ULTIMA_ALTERACAO >= CURRENT_TIMESTAMP - 2)
+            WHERE ${getDateWhereClause(overrideDays)}
               AND COALESCE(D.CANCELADO, 'N') <> 'S'
         `;
 
@@ -287,7 +301,38 @@ async function syncFiadoOrdersFromToday() {
 });
 }
 
+async function checkPendingSyncCommands() {
+    try {
+        const response = await axios.get(`${VERCEL_URL}/api/sync/trigger?syncToken=${SYNC_TOKEN}`);
+        if (response.data && response.data.pendingCommand) {
+            const cmd = response.data.pendingCommand;
+            console.log(`[!] SOLICITAÇÃO WEB RECEBIDA: Sincronizar ${cmd.daysBack} dias (ID: ${cmd.id})...`);
+            
+            await axios.post(`${VERCEL_URL}/api/sync/trigger`, {
+                syncToken: SYNC_TOKEN,
+                action: 'START',
+                commandId: cmd.id
+            });
+
+            syncAllOrdersFromToday(cmd.daysBack || 7);
+            setTimeout(() => syncFiadoOrdersFromToday(cmd.daysBack || 7), 3000);
+
+            setTimeout(async () => {
+                await axios.post(`${VERCEL_URL}/api/sync/trigger`, {
+                    syncToken: SYNC_TOKEN,
+                    action: 'COMPLETE',
+                    commandId: cmd.id
+                });
+                console.log(`[OK] Sincronização manual (${cmd.daysBack} dias) concluída com sucesso!`);
+            }, 10000);
+        }
+    } catch (err) {
+        // Silencioso em falhas temporárias
+    }
+}
+
 function runAllSyncJobs() {
+    checkPendingSyncCommands();
     syncAllOrdersFromToday();
     // Roda a sincronização de FIADO 3 segundos depois da de entregas para evitar concorrência direta
     setTimeout(syncFiadoOrdersFromToday, 3000);

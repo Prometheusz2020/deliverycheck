@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { 
   Users, DollarSign, Plus, Trash2, Calendar, Search, 
   FileText, CheckCircle, UserPlus, Loader2, Phone, 
-  MapPin, Clock, X, Info, AlertTriangle, ArrowRight, CornerDownRight, Printer
+  MapPin, Clock, X, Info, AlertTriangle, ArrowRight, CornerDownRight, Printer, RefreshCw
 } from "lucide-react";
 import { 
   getCustomers, addCustomer, editCustomer, deleteCustomer, 
@@ -106,6 +106,64 @@ export default function CreditSalesDashboard() {
   const [isSubmittingPayment, setIsSubmittingPayment] = useState(false);
   const [recentSales, setRecentSales] = useState<any[]>([]);
   
+  // Estado de Sincronização Manual via Web
+  const [isTriggeringSync, setIsTriggeringSync] = useState(false);
+  const [syncMessage, setSyncMessage] = useState<string | null>(null);
+
+  const handleTriggerManualSync = async (daysBack: number = 7) => {
+    setIsTriggeringSync(true);
+    setSyncMessage("Enviando solicitação ao agente local GPlus...");
+    try {
+      const res = await fetch("/api/sync/trigger", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ daysBack }),
+      });
+      const data = await res.json();
+      if (data.success && data.command) {
+        setSyncMessage("Solicitação enviada! Aguardando o agente local...");
+        const commandId = data.command.id;
+        let attempts = 0;
+        const checkInterval = setInterval(async () => {
+          attempts++;
+          try {
+            const checkRes = await fetch("/api/sync/trigger");
+            const checkData = await checkRes.json();
+            if (checkData.lastCommand && checkData.lastCommand.id === commandId) {
+              if (checkData.lastCommand.status === "COMPLETED") {
+                clearInterval(checkInterval);
+                setIsTriggeringSync(false);
+                setSyncMessage("Sincronização concluída com sucesso!");
+                fetchCustomers();
+                fetchRecentSales();
+                if (selectedCustomerId) fetchDetails(selectedCustomerId);
+                setTimeout(() => setSyncMessage(null), 4000);
+                return;
+              }
+            }
+          } catch (e) {}
+
+          if (attempts > 12) {
+            clearInterval(checkInterval);
+            setIsTriggeringSync(false);
+            setSyncMessage("Solicitação enviada. O agente local executará em segundo plano.");
+            fetchCustomers();
+            fetchRecentSales();
+            setTimeout(() => setSyncMessage(null), 4000);
+          }
+        }, 2500);
+      } else {
+        alert(data.error || "Erro ao solicitar sincronização.");
+        setIsTriggeringSync(false);
+        setSyncMessage(null);
+      }
+    } catch (err) {
+      alert("Erro ao conectar com a API.");
+      setIsTriggeringSync(false);
+      setSyncMessage(null);
+    }
+  };
+
   // Filtros de Data para Lançamentos Fiado (Hoje / Ontem / Data Específica / Todos)
   const [recentSalesFilter, setRecentSalesFilter] = useState<'hoje' | 'ontem' | 'custom' | 'todos'>('hoje');
   const [customDateFilter, setCustomDateFilter] = useState<string>(new Date().toLocaleDateString('sv-SE'));
@@ -539,7 +597,15 @@ export default function CreditSalesDashboard() {
   useEffect(() => {
     fetchCustomers();
     fetchRecentSales();
-  }, [fetchCustomers, fetchRecentSales]);
+    const interval = setInterval(() => {
+      fetchCustomers();
+      fetchRecentSales();
+      if (selectedCustomerId) {
+        fetchDetails(selectedCustomerId);
+      }
+    }, 15000);
+    return () => clearInterval(interval);
+  }, [fetchCustomers, fetchRecentSales, selectedCustomerId, fetchDetails]);
 
   useEffect(() => {
     if (selectedCustomerId) {
@@ -711,6 +777,7 @@ export default function CreditSalesDashboard() {
         setPayAmount("");
         setPayNotes("");
         fetchCustomers();
+        fetchDetails(payCustomerId);
         // Redireciona e seleciona
         setSelectedCustomerId(payCustomerId);
         setActiveTab('customers');
@@ -807,7 +874,30 @@ export default function CreditSalesDashboard() {
         </div>
 
         {activeTab === 'customers' && (
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <button 
+              onClick={() => handleTriggerManualSync(7)}
+              disabled={isTriggeringSync}
+              className="btn-outline" 
+              style={{ 
+                padding: '0.5rem 1rem', 
+                fontSize: '11px', 
+                borderRadius: '10px', 
+                height: '38px', 
+                gap: '6px', 
+                display: 'flex', 
+                alignItems: 'center',
+                borderColor: 'var(--primary)',
+                color: 'var(--primary)',
+                background: 'rgba(0, 242, 255, 0.05)',
+                opacity: isTriggeringSync ? 0.7 : 1,
+                cursor: isTriggeringSync ? 'wait' : 'pointer'
+              }}
+              title="Solicita ao agente local GPlus para sincronizar os dados dos últimos 7 dias imediatamente"
+            >
+              {isTriggeringSync ? <Loader2 size={14} className="spin" /> : <RefreshCw size={14} />}
+              {isTriggeringSync ? "Sincronizando GPlus..." : "Sincronizar GPlus (7 Dias)"}
+            </button>
             <button 
               onClick={handlePrintGeneralReport}
               className="btn-outline" 
@@ -835,6 +925,24 @@ export default function CreditSalesDashboard() {
           </div>
         )}
       </div>
+
+      {syncMessage && (
+        <div style={{
+          padding: '0.8rem 1.2rem',
+          borderRadius: '10px',
+          background: 'rgba(0, 242, 255, 0.1)',
+          border: '1px solid var(--primary)',
+          color: '#fff',
+          fontSize: '12px',
+          fontWeight: 700,
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px'
+        }}>
+          <Info size={16} style={{ color: 'var(--primary)' }} />
+          {syncMessage}
+        </div>
+      )}
 
       {/* 1. ABA DE CLIENTES E EXTRATO (MASTER-DETAIL) */}
       {activeTab === 'customers' && (
