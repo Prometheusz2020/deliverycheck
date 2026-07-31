@@ -477,16 +477,6 @@ export default function CreditSalesDashboard() {
     }
   };
 
-  // Carregar as vendas recentes across todos os clientes
-  const fetchRecentSales = useCallback(async () => {
-    try {
-      const data = await getRecentCreditSales();
-      setRecentSales(data);
-    } catch (err) {
-      console.error(err);
-    }
-  }, []);
-
   // Processamento FIFO de alocação de pagamentos e agrupamento mensal
   const processedData = useMemo(() => {
     if (!customerDetails) return { allocatedSales: [], monthlyBreakdown: [] };
@@ -567,9 +557,19 @@ export default function CreditSalesDashboard() {
     return { allocatedSales, monthlyBreakdown };
   }, [customerDetails]);
 
-  // Carregar lista de clientes
-  const fetchCustomers = useCallback(async () => {
-    setIsLoading(true);
+  // Carregar as vendas recentes across todos os clientes
+  const fetchRecentSales = useCallback(async () => {
+    try {
+      const data = await getRecentCreditSales();
+      setRecentSales(data);
+    } catch (err) {
+      console.error(err);
+    }
+  }, []);
+
+  // Carregar lista de clientes (isSilent = true atualiza sem ativar o spinner)
+  const fetchCustomers = useCallback(async (isSilent = false) => {
+    if (!isSilent) setIsLoading(true);
     try {
       const data = await getCustomers();
       setCustomers(data as any);
@@ -577,43 +577,49 @@ export default function CreditSalesDashboard() {
     } catch (err) {
       console.error(err);
     } finally {
-      setIsLoading(false);
+      if (!isSilent) setIsLoading(false);
     }
   }, [fetchRecentSales]);
 
-  // Carregar detalhes de um cliente
-  const fetchDetails = useCallback(async (id: string) => {
-    setIsLoadingDetails(true);
+  // Carregar detalhes de um cliente (isSilent = true atualiza sem ativar o spinner)
+  const fetchDetails = useCallback(async (id: string, isSilent = false) => {
+    if (!isSilent) setIsLoadingDetails(true);
     try {
       const data = await getCustomerDetails(id);
       setCustomerDetails(data as any);
     } catch (err) {
       console.error(err);
     } finally {
-      setIsLoadingDetails(false);
+      if (!isSilent) setIsLoadingDetails(false);
     }
   }, []);
 
+  // Carga inicial
   useEffect(() => {
-    fetchCustomers();
+    fetchCustomers(false);
     fetchRecentSales();
-    const interval = setInterval(() => {
-      fetchCustomers();
-      fetchRecentSales();
-      if (selectedCustomerId) {
-        fetchDetails(selectedCustomerId);
-      }
-    }, 15000);
-    return () => clearInterval(interval);
-  }, [fetchCustomers, fetchRecentSales, selectedCustomerId, fetchDetails]);
+  }, [fetchCustomers, fetchRecentSales]);
 
+  // Atualização ao selecionar outro cliente
   useEffect(() => {
     if (selectedCustomerId) {
-      fetchDetails(selectedCustomerId);
+      fetchDetails(selectedCustomerId, false);
     } else {
       setCustomerDetails(null);
     }
   }, [selectedCustomerId, fetchDetails]);
+
+  // Atualização silenciosa em segundo plano a cada 15 segundos (sem piscar a tela)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchCustomers(true);
+      fetchRecentSales();
+      if (selectedCustomerId) {
+        fetchDetails(selectedCustomerId, true);
+      }
+    }, 15000);
+    return () => clearInterval(interval);
+  }, [fetchCustomers, fetchRecentSales, selectedCustomerId, fetchDetails]);
 
   // Handler para cadastrar/editar cliente
   const handleSaveCustomer = async (e: React.FormEvent) => {
