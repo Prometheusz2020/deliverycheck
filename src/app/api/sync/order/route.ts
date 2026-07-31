@@ -14,6 +14,15 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Missing order data" }, { status: 400 });
     }
 
+    // Ignora comandas que foram excluídas manualmente no site
+    const isDeletedOnWeb = await prisma.deletedDelivery.findFirst({
+      where: { orderNumber: String(order.orderNumber).trim() },
+    });
+
+    if (isDeletedOnWeb) {
+      return NextResponse.json({ success: true, message: "Ignorado pois foi excluído no site pelo usuário" });
+    }
+
     // Ignora comandas que estão sem valor (<= 0), pois são lançamentos incompletos/com erro
     if (order.totalAmount !== undefined && order.totalAmount !== null && order.totalAmount <= 0) {
       return NextResponse.json({ success: true, message: "Ignorado por estar sem valor" });

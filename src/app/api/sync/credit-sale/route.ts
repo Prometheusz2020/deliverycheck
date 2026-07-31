@@ -16,6 +16,18 @@ export async function POST(req: Request) {
 
     const { gplusId, customerName, gplusCustomerId, totalAmount, date, notes, orderNumber, items } = creditSale;
 
+    // 0. Verifica se esta comanda foi explicitamente excluída no site pelo usuário
+    const isDeletedOnWeb = await prisma.deletedGPlusSale.findUnique({
+      where: { gplusId: String(gplusId).trim() },
+    });
+
+    if (isDeletedOnWeb) {
+      return NextResponse.json({
+        success: true,
+        message: `Comanda #${orderNumber} (GPlus ID: ${gplusId}) ignorada pois foi excluída no site pelo usuário.`,
+      });
+    }
+
     // Se o pedido foi cancelado no GPlus, removemos do fiado se já existir na nuvem
     if (creditSale.status === "CANCELADO") {
       const existing = await prisma.creditSale.findUnique({

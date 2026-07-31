@@ -203,6 +203,17 @@ export async function bulkAssignDeliveries(deliveryIds: string[], newDriverId: s
 }
 
 export async function deleteDelivery(id: string) {
+  const delivery = await prisma.delivery.findUnique({
+    where: { id },
+    select: { orderNumber: true },
+  });
+
+  if (delivery?.orderNumber) {
+    await prisma.deletedDelivery.create({
+      data: { orderNumber: delivery.orderNumber },
+    });
+  }
+
   await prisma.delivery.delete({ where: { id } });
   revalidatePath("/restaurant");
   revalidatePath("/driver");

@@ -301,41 +301,27 @@ async function syncFiadoOrdersFromToday(overrideDays = null) {
 });
 }
 
-async function checkPendingSyncCommands() {
-    try {
-        const response = await axios.get(`${VERCEL_URL}/api/sync/trigger?syncToken=${SYNC_TOKEN}`);
-        if (response.data && response.data.pendingCommand) {
-            const cmd = response.data.pendingCommand;
-            console.log(`[!] SOLICITAÇÃO WEB RECEBIDA: Sincronizar ${cmd.daysBack} dias (ID: ${cmd.id})...`);
-            
-            await axios.post(`${VERCEL_URL}/api/sync/trigger`, {
-                syncToken: SYNC_TOKEN,
-                action: 'START',
-                commandId: cmd.id
-            });
+let lastMorningSyncDate = null;
 
-            syncAllOrdersFromToday(cmd.daysBack || 7);
-            setTimeout(() => syncFiadoOrdersFromToday(cmd.daysBack || 7), 3000);
-
-            setTimeout(async () => {
-                await axios.post(`${VERCEL_URL}/api/sync/trigger`, {
-                    syncToken: SYNC_TOKEN,
-                    action: 'COMPLETE',
-                    commandId: cmd.id
-                });
-                console.log(`[OK] Sincronização manual (${cmd.daysBack} dias) concluída com sucesso!`);
-            }, 10000);
-        }
-    } catch (err) {
-        // Silencioso em falhas temporárias
+function checkScheduledMorningSync() {
+    const now = new Date();
+    const todayStr = now.toISOString().split('T')[0];
+    
+    // Executa às 09:00 AM se ainda não tiver executado hoje
+    if (now.getHours() === 9 && now.getMinutes() === 0 && lastMorningSyncDate !== todayStr) {
+        lastMorningSyncDate = todayStr;
+        console.log(`[+] [09:00 AM] Executando Sincronização Matinal Programada (últimos 7 dias)...`);
+        runAllSyncJobs(7);
     }
 }
 
-function runAllSyncJobs() {
-    checkPendingSyncCommands();
-    syncAllOrdersFromToday();
+function runAllSyncJobs(overrideDays = null) {
+    if (overrideDays) {
+        console.log(`[+] Executando Sincronização Retroativa Matinal de ${overrideDays} dias...`);
+    }
+    syncAllOrdersFromToday(overrideDays);
     // Roda a sincronização de FIADO 3 segundos depois da de entregas para evitar concorrência direta
-    setTimeout(syncFiadoOrdersFromToday, 3000);
+    setTimeout(() => syncFiadoOrdersFromToday(overrideDays), 3000);
 }
 
 // Inicia em loop
@@ -346,5 +332,12 @@ console.log(`Servidor: ${fbOptions.host}:${fbOptions.port}`);
 console.log(`Intervalo: ${POLLING_INTERVAL/1000}s`);
 console.log('=========================================');
 
-runAllSyncJobs();
-setInterval(runAllSyncJobs, POLLING_INTERVAL);
+// 1. Sincronização Matinal de Inicialização (ao ligar o computador / iniciar o serviço)
+console.log(`[+] [STARTUP] Computador/Serviço ligado: Executando Sincronização Matinal Inicial (7 dias)...`);
+runAllSyncJobs(7);
+
+// 2. Loop regular de 30s para o dia a dia + Verificação das 09:00 AM
+setInterval(() => {
+    checkScheduledMorningSync();
+    runAllSyncJobs();
+}, POLLING_INTERVAL);

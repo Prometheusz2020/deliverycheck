@@ -133,3 +133,19 @@ model SyncCommand {
 
   @@map("sync_commands")
 }
+
+model DeletedGPlusSale {
+  id        String   @id @default(uuid())
+  gplusId   String   @unique
+  deletedAt DateTime @default(now())
+
+  @@map("deleted_gplus_sales")
+}
+
+model DeletedDelivery {
+  id          String   @id @default(uuid())
+  orderNumber String
+  deletedAt   DateTime @default(now())
+
+  @@map("deleted_deliveries")
+}

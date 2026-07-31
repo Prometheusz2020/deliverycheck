@@ -874,30 +874,7 @@ export default function CreditSalesDashboard() {
         </div>
 
         {activeTab === 'customers' && (
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-            <button 
-              onClick={() => handleTriggerManualSync(7)}
-              disabled={isTriggeringSync}
-              className="btn-outline" 
-              style={{ 
-                padding: '0.5rem 1rem', 
-                fontSize: '11px', 
-                borderRadius: '10px', 
-                height: '38px', 
-                gap: '6px', 
-                display: 'flex', 
-                alignItems: 'center',
-                borderColor: 'var(--primary)',
-                color: 'var(--primary)',
-                background: 'rgba(0, 242, 255, 0.05)',
-                opacity: isTriggeringSync ? 0.7 : 1,
-                cursor: isTriggeringSync ? 'wait' : 'pointer'
-              }}
-              title="Solicita ao agente local GPlus para sincronizar os dados dos últimos 7 dias imediatamente"
-            >
-              {isTriggeringSync ? <Loader2 size={14} className="spin" /> : <RefreshCw size={14} />}
-              {isTriggeringSync ? "Sincronizando GPlus..." : "Sincronizar GPlus (7 Dias)"}
-            </button>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             <button 
               onClick={handlePrintGeneralReport}
               className="btn-outline" 
@@ -925,24 +902,6 @@ export default function CreditSalesDashboard() {
           </div>
         )}
       </div>
-
-      {syncMessage && (
-        <div style={{
-          padding: '0.8rem 1.2rem',
-          borderRadius: '10px',
-          background: 'rgba(0, 242, 255, 0.1)',
-          border: '1px solid var(--primary)',
-          color: '#fff',
-          fontSize: '12px',
-          fontWeight: 700,
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px'
-        }}>
-          <Info size={16} style={{ color: 'var(--primary)' }} />
-          {syncMessage}
-        </div>
-      )}
 
       {/* 1. ABA DE CLIENTES E EXTRATO (MASTER-DETAIL) */}
       {activeTab === 'customers' && (

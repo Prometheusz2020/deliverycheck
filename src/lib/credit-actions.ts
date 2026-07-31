@@ -212,6 +212,19 @@ export async function getCustomerDetails(customerId: string) {
 
 export async function deleteCreditSale(saleId: string) {
   try {
+    const sale = await prisma.creditSale.findUnique({
+      where: { id: saleId },
+      select: { gplusId: true },
+    });
+
+    if (sale?.gplusId) {
+      await prisma.deletedGPlusSale.upsert({
+        where: { gplusId: sale.gplusId },
+        create: { gplusId: sale.gplusId },
+        update: {},
+      });
+    }
+
     await prisma.creditSale.delete({
       where: { id: saleId },
     });
