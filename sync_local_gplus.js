@@ -66,7 +66,8 @@ async function syncAllOrdersFromToday() {
             FROM ECF_VENDA_CABECALHO V
             LEFT JOIN ECF_VENDA_COMANDA C ON (C.ID_VENDA_CABECALHO = V.ID)
             LEFT JOIN ENDERECO E ON (E.ID = V.ID_ENDERECO)
-            WHERE V.DATA_VENDA = CURRENT_DATE
+            WHERE V.DATA_VENDA >= CURRENT_DATE - 3
+               OR V.DATA_HORA_ULTIMA_ALTERACAO >= CURRENT_TIMESTAMP - 1
         `;
 
         db.query(sql, async (err, result) => {
@@ -173,7 +174,8 @@ async function syncFiadoOrdersFromToday() {
             LEFT JOIN ECF_VENDA_COMANDA C ON (C.ID_VENDA_CABECALHO = V.ID)
             JOIN ECF_TOTAL_TIPO_PAGAMENTO P ON (P.ID_ECF_VENDA_CABECALHO = V.ID)
             JOIN ECF_TIPO_PAGAMENTO TP ON (TP.ID = P.ID_ECF_TIPO_PAGAMENTO)
-            WHERE V.DATA_VENDA = CURRENT_DATE
+            WHERE (V.DATA_VENDA >= CURRENT_DATE - 7 OR V.DATA_HORA_ULTIMA_ALTERACAO >= CURRENT_TIMESTAMP - 2)
+              AND COALESCE(P.EXCLUIDO, 'N') <> 'S'
         `;
 
         const detailsSql = `
@@ -186,7 +188,7 @@ async function syncFiadoOrdersFromToday() {
             FROM ECF_VENDA_DETALHE D
             LEFT JOIN PRODUTO P ON (P.ID = D.ID_ECF_PRODUTO)
             JOIN ECF_VENDA_CABECALHO V ON (V.ID = D.ID_ECF_VENDA_CABECALHO)
-            WHERE V.DATA_VENDA = CURRENT_DATE
+            WHERE (V.DATA_VENDA >= CURRENT_DATE - 7 OR V.DATA_HORA_ULTIMA_ALTERACAO >= CURRENT_TIMESTAMP - 2)
               AND COALESCE(D.CANCELADO, 'N') <> 'S'
         `;
 
