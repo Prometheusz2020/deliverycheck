@@ -258,21 +258,52 @@ export async function restoreDelivery(id: string) {
   });
 
   if (deleted) {
-    await prisma.delivery.create({
-      data: {
-        orderNumber: deleted.orderNumber,
-        customerName: deleted.customerName || "Consumidor",
-        address: deleted.address || "Não informado",
-        totalAmount: deleted.totalAmount || 0,
-        deliveryFee: deleted.deliveryFee || 0,
-        status: deleted.status || "PENDENTE",
-        deliveryPerson: deleted.deliveryPerson,
-        paymentMethod: deleted.paymentMethod,
-        observations: deleted.observations,
-        itemsCount: deleted.itemsCount || 1,
-        scannedAt: deleted.scannedAt || new Date(),
-      },
-    });
+    let matchedCustomer = null;
+    if (deleted.customerName) {
+      matchedCustomer = await prisma.customer.findFirst({
+        where: {
+          name: { equals: deleted.customerName, mode: 'insensitive' }
+        }
+      });
+    }
+
+    if (deleted.status === "FIADO" && matchedCustomer) {
+      await prisma.creditSale.create({
+        data: {
+          customerId: matchedCustomer.id,
+          date: deleted.scannedAt || new Date(),
+          totalAmount: deleted.totalAmount || 0,
+          notes: deleted.observations || `Comanda fiado restaurada (${deleted.orderNumber})`,
+          status: "PENDENTE",
+          items: {
+            create: [
+              {
+                description: `Consumo Restaurado (${deleted.orderNumber})`,
+                quantity: 1,
+                unitPrice: deleted.totalAmount || 0,
+                totalPrice: deleted.totalAmount || 0,
+              }
+            ]
+          }
+        }
+      });
+    } else {
+      await prisma.delivery.create({
+        data: {
+          orderNumber: deleted.orderNumber,
+          customerName: deleted.customerName || "Consumidor",
+          address: deleted.address || "Não informado",
+          totalAmount: deleted.totalAmount || 0,
+          deliveryFee: deleted.deliveryFee || 0,
+          status: deleted.status && deleted.status !== "FIADO" ? deleted.status : "PENDENTE",
+          deliveryPerson: deleted.deliveryPerson,
+          paymentMethod: deleted.paymentMethod,
+          observations: deleted.observations,
+          itemsCount: deleted.itemsCount || 1,
+          scannedAt: deleted.scannedAt || new Date(),
+        },
+      });
+    }
 
     await prisma.deletedDelivery.delete({ where: { id } });
   }

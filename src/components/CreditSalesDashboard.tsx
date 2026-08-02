@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { 
   Users, DollarSign, Plus, Trash2, Calendar, Search, 
   FileText, CheckCircle, UserPlus, Loader2, Phone, 
-  MapPin, Clock, X, Info, AlertTriangle, ArrowRight, CornerDownRight, Printer, RefreshCw
+  MapPin, Clock, X, Info, AlertTriangle, ArrowRight, CornerDownRight, Printer, RefreshCw, RotateCcw
 } from "lucide-react";
 import { 
   getCustomers, addCustomer, editCustomer, deleteCustomer, 
@@ -66,8 +66,9 @@ type CustomerDetailsType = {
 };
 
 export default function CreditSalesDashboard() {
-  const [activeTab, setActiveTab] = useState<'customers' | 'new-sale' | 'new-payment'>('customers');
+  const [activeTab, setActiveTab] = useState<'customers' | 'new-sale' | 'new-payment' | 'deleted'>('customers');
   const [customers, setCustomers] = useState<CustomerType[]>([]);
+  const [deletedDeliveries, setDeletedDeliveries] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   
@@ -594,11 +595,23 @@ export default function CreditSalesDashboard() {
     }
   }, []);
 
+  // Carregar as comandas deletadas
+  const fetchDeleted = useCallback(async () => {
+    try {
+      const actions = await import("@/lib/actions");
+      const data = await actions.getDeletedDeliveries();
+      setDeletedDeliveries(data as any);
+    } catch (err) {
+      console.error(err);
+    }
+  }, []);
+
   // Carga inicial
   useEffect(() => {
     fetchCustomers(false);
     fetchRecentSales();
-  }, [fetchCustomers, fetchRecentSales]);
+    fetchDeleted();
+  }, [fetchCustomers, fetchRecentSales, fetchDeleted]);
 
   // Atualização ao selecionar outro cliente
   useEffect(() => {
@@ -614,12 +627,13 @@ export default function CreditSalesDashboard() {
     const interval = setInterval(() => {
       fetchCustomers(true);
       fetchRecentSales();
+      fetchDeleted();
       if (selectedCustomerId) {
         fetchDetails(selectedCustomerId, true);
       }
     }, 15000);
     return () => clearInterval(interval);
-  }, [fetchCustomers, fetchRecentSales, selectedCustomerId, fetchDetails]);
+  }, [fetchCustomers, fetchRecentSales, fetchDeleted, selectedCustomerId, fetchDetails]);
 
   // Handler para cadastrar/editar cliente
   const handleSaveCustomer = async (e: React.FormEvent) => {
@@ -806,6 +820,7 @@ export default function CreditSalesDashboard() {
       if (res.success) {
         fetchCustomers();
         fetchRecentSales();
+        fetchDeleted();
         if (selectedCustomerId) fetchDetails(selectedCustomerId);
       } else {
         alert(res.error || "Erro ao excluir venda.");
@@ -876,6 +891,13 @@ export default function CreditSalesDashboard() {
             style={{ padding: '0.5rem 1.2rem', fontSize: '11px', borderRadius: '6px', border: 'none', marginLeft: '0.2rem', height: '34px' }}
           >
             <DollarSign size={14} /> Receber Pagamento
+          </button>
+          <button 
+            onClick={() => setActiveTab('deleted')} 
+            className={activeTab === 'deleted' ? 'btn-main' : 'btn-outline'} 
+            style={{ padding: '0.5rem 1.2rem', fontSize: '11px', borderRadius: '6px', border: 'none', marginLeft: '0.2rem', height: '34px', background: activeTab === 'deleted' ? 'var(--danger)' : undefined }}
+          >
+            <Trash2 size={14} /> Comandas Deletadas ({deletedDeliveries.length})
           </button>
         </div>
 
@@ -1823,6 +1845,109 @@ export default function CreditSalesDashboard() {
               </div>
 
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* 4. ABA DE COMANDAS DELETADAS (FIADO / DELIVERIES) */}
+      {activeTab === 'deleted' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          <div className="card-premium" style={{ borderTop: '4px solid var(--danger)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+              <h3 style={{ color: 'var(--danger)', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+                <Trash2 size={20} /> COMANDAS EXCLUÍDAS ({deletedDeliveries.length})
+              </h3>
+              <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                Comandas nesta lista <strong>não serão re-sincronizadas</strong> do GPlus.
+              </span>
+            </div>
+
+            {deletedDeliveries.length === 0 ? (
+              <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                <Trash2 size={48} style={{ opacity: 0.3, marginBottom: '1rem' }} />
+                <p style={{ fontSize: '14px', fontWeight: 600 }}>Nenhuma comanda excluída encontrada.</p>
+              </div>
+            ) : (
+              <div className="table-wrapper">
+                <table className="table-premium">
+                  <thead>
+                    <tr>
+                      <th>Comanda</th>
+                      <th>Cliente</th>
+                      <th>Valor Total</th>
+                      <th>Data do Lançamento</th>
+                      <th>Data da Exclusão</th>
+                      <th>Observações / Status</th>
+                      <th style={{ textAlign: 'right' }}>Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {deletedDeliveries.map((item) => (
+                      <tr key={item.id}>
+                        <td style={{ fontWeight: 800, color: 'var(--danger)' }}>
+                          {item.orderNumber}
+                          {item.status === 'FIADO' && (
+                            <span style={{ marginLeft: '6px', fontSize: '9px', background: 'rgba(255,149,0,0.2)', color: 'var(--warning)', padding: '2px 6px', borderRadius: '4px' }}>
+                              FIADO
+                            </span>
+                          )}
+                        </td>
+                        <td>
+                          <p style={{ fontWeight: 700 }}>{item.customerName || "Consumidor"}</p>
+                          <p style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{item.address || "Sem endereço"}</p>
+                        </td>
+                        <td style={{ fontWeight: 700, color: 'var(--text-secondary)' }}>
+                          R$ {(item.totalAmount || 0).toFixed(2)}
+                        </td>
+                        <td style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                          {item.scannedAt ? new Date(item.scannedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--'}
+                        </td>
+                        <td style={{ fontSize: '11px', color: 'var(--warning)' }}>
+                          {new Date(item.deletedAt).toLocaleDateString()} {new Date(item.deletedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </td>
+                        <td style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                          {item.observations || '--'}
+                        </td>
+                        <td style={{ textAlign: 'right' }}>
+                          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                            <button
+                              onClick={async () => {
+                                if (confirm(`Restaurar a comanda ${item.orderNumber}?`)) {
+                                  const actions = await import("@/lib/actions");
+                                  await actions.restoreDelivery(item.id);
+                                  fetchCustomers();
+                                  fetchRecentSales();
+                                  fetchDeleted();
+                                  if (selectedCustomerId) fetchDetails(selectedCustomerId);
+                                }
+                              }}
+                              className="btn-outline"
+                              style={{ padding: '0.4rem 0.8rem', fontSize: '11px', borderColor: 'var(--primary)', color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '4px' }}
+                              title="Restaurar comanda"
+                            >
+                              <RotateCcw size={14} /> Restaurar
+                            </button>
+                            <button
+                              onClick={async () => {
+                                if (confirm(`Remover permanentemente o registro da comanda ${item.orderNumber}? (Atenção: Se ela continuar no GPlus, poderá ser re-sincronizada).`)) {
+                                  const actions = await import("@/lib/actions");
+                                  await actions.permanentDeleteDelivery(item.id);
+                                  fetchDeleted();
+                                }
+                              }}
+                              style={{ padding: '0.4rem 0.8rem', background: 'rgba(255,45,85,0.15)', border: '1px solid rgba(255,45,85,0.3)', borderRadius: '6px', color: 'var(--danger)', fontSize: '11px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                              title="Excluir registro permanentemente"
+                            >
+                              <Trash2 size={14} /> Excluir
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </div>
       )}

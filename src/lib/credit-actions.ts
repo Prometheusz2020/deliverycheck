@@ -214,20 +214,40 @@ export async function deleteCreditSale(saleId: string) {
   try {
     const sale = await prisma.creditSale.findUnique({
       where: { id: saleId },
-      select: { gplusId: true },
+      include: { customer: true },
     });
 
-    if (sale?.gplusId) {
-      await prisma.deletedGPlusSale.upsert({
-        where: { gplusId: sale.gplusId },
-        create: { gplusId: sale.gplusId },
-        update: {},
+    if (sale) {
+      if (sale.gplusId) {
+        await prisma.deletedGPlusSale.upsert({
+          where: { gplusId: sale.gplusId },
+          create: { gplusId: sale.gplusId },
+          update: {},
+        });
+      }
+
+      // Extrai o número da comanda das notas (ex: "Comanda #123") ou usa o gplusId
+      const match = sale.notes?.match(/Comanda\s*#?(\d+)/i);
+      const comandaNum = match ? `#${match[1]}` : (sale.gplusId ? `#${sale.gplusId}` : `Fiado ${sale.customer?.name || ''}`);
+
+      await prisma.deletedDelivery.create({
+        data: {
+          orderNumber: comandaNum,
+          customerName: sale.customer?.name || "Cliente Fiado",
+          address: sale.customer?.address || "Venda a Prazo",
+          totalAmount: sale.totalAmount,
+          deliveryFee: 0,
+          status: "FIADO",
+          observations: sale.notes || `Venda a prazo excluída (${sale.customer?.name || 'Consumidor'})`,
+          scannedAt: sale.date,
+        },
+      });
+
+      await prisma.creditSale.delete({
+        where: { id: saleId },
       });
     }
 
-    await prisma.creditSale.delete({
-      where: { id: saleId },
-    });
     revalidatePath("/restaurant");
     return { success: true };
   } catch (error) {
