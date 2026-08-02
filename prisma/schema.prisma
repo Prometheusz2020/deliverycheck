@@ -143,9 +143,19 @@ model DeletedGPlusSale {
 }
 
 model DeletedDelivery {
-  id          String   @id @default(uuid())
-  orderNumber String
-  deletedAt   DateTime @default(now())
+  id             String    @id @default(uuid())
+  orderNumber    String
+  customerName   String?
+  address        String?
+  totalAmount    Float?
+  deliveryFee    Float     @default(0)
+  status         String?
+  deliveryPerson String?
+  paymentMethod  String?
+  observations   String?
+  itemsCount     Int       @default(1)
+  scannedAt      DateTime?
+  deletedAt      DateTime  @default(now())
 
   @@map("deleted_deliveries")
 }

@@ -14,9 +14,18 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Missing order data" }, { status: 400 });
     }
 
+    const rawOrderNum = String(order.orderNumber).trim();
+    const cleanOrderNum = rawOrderNum.replace(/^#/, "").trim();
+
     // Ignora comandas que foram excluídas manualmente no site
-    const isDeletedOnWeb = await prisma.deletedDelivery.findFirst({
-      where: { orderNumber: String(order.orderNumber).trim() },
+    const deletedDeliveries = await prisma.deletedDelivery.findMany({
+      select: { orderNumber: true }
+    });
+
+    const isDeletedOnWeb = deletedDeliveries.some(d => {
+      const dRaw = d.orderNumber.trim();
+      const dClean = dRaw.replace(/^#/, "").trim();
+      return dRaw === rawOrderNum || (cleanOrderNum.length > 0 && dClean === cleanOrderNum);
     });
 
     if (isDeletedOnWeb) {

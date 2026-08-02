@@ -6,17 +6,18 @@ import { Delivery, DeliverySummary, Driver } from "@/lib/types";
 import { 
   Clock, UserPlus, MessageSquare, DollarSign, Loader2, 
   BarChart2, Users, ClipboardList, TrendingUp, MapPin, 
-  Briefcase, LogOut, Package, User
+  Briefcase, LogOut, Package, User, Trash2, RotateCcw
 } from "lucide-react";
 import CreditSalesDashboard from "./CreditSalesDashboard";
 
 export default function RestaurantPortal() {
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
   const [drivers, setDrivers] = useState<Driver[]>([]);
+  const [deletedDeliveries, setDeletedDeliveries] = useState<any[]>([]);
   const [summary, setSummary] = useState<DeliverySummary>({ 
     pending: 0, onRoute: 0, delivered: 0, totalValue: 0, totalFees: 0 
   });
-  const [activeTab, setActiveTab] = useState<'deliveries' | 'drivers' | 'creditsales'>('deliveries');
+  const [activeTab, setActiveTab] = useState<'deliveries' | 'drivers' | 'creditsales' | 'deleted'>('deliveries');
   
   const [newDriverName, setNewDriverName] = useState("");
   const [newDriverPass, setNewDriverPass] = useState("");
@@ -88,14 +89,16 @@ export default function RestaurantPortal() {
   const fetchData = useCallback(async () => {
     try {
       const actions = await import("@/lib/actions");
-      const [d, dr, s] = await Promise.all([
+      const [d, dr, s, del] = await Promise.all([
         actions.getDeliveries(selectedDate), 
         actions.getDrivers(), 
-        actions.getSummary(selectedDate)
+        actions.getSummary(selectedDate),
+        actions.getDeletedDeliveries(selectedDate)
       ]);
       setDeliveries(d as any);
       setDrivers(dr);
       setSummary(s);
+      setDeletedDeliveries(del as any);
     } catch (err) {
       console.error("Portal Fetch Error:", err);
     }
@@ -154,6 +157,9 @@ export default function RestaurantPortal() {
             </button>
             <button onClick={() => setActiveTab('creditsales')} className={activeTab === 'creditsales' ? 'btn-main' : 'btn-outline'} style={{ padding: '0.6rem 1.5rem', fontSize: '12px', borderRadius: '8px', marginLeft: '0.4rem' }}>
               <DollarSign size={16} /> Fiado / Prazo
+            </button>
+            <button onClick={() => setActiveTab('deleted')} className={activeTab === 'deleted' ? 'btn-main' : 'btn-outline'} style={{ padding: '0.6rem 1.5rem', fontSize: '12px', borderRadius: '8px', marginLeft: '0.4rem', background: activeTab === 'deleted' ? 'var(--danger)' : undefined }}>
+              <Trash2 size={16} /> Deletadas ({deletedDeliveries.length})
             </button>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', background: 'var(--surface-high)', padding: '0.4rem 0.8rem', borderRadius: '12px', gap: '8px' }}>
@@ -718,8 +724,100 @@ export default function RestaurantPortal() {
             </div>
           </div>
         </div>
-      ) : (
+      ) : activeTab === 'creditsales' ? (
         <CreditSalesDashboard />
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          <div className="card-premium" style={{ borderTop: '4px solid var(--danger)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+              <h3 style={{ color: 'var(--danger)', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+                <Trash2 size={20} /> COMANDAS DELETADAS ({deletedDeliveries.length})
+              </h3>
+              <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                Comandas nesta lista <strong>não serão re-sincronizadas</strong> do GPlus.
+              </span>
+            </div>
+
+            {deletedDeliveries.length === 0 ? (
+              <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                <Trash2 size={48} style={{ opacity: 0.3, marginBottom: '1rem' }} />
+                <p style={{ fontSize: '14px', fontWeight: 600 }}>Nenhuma comanda deletada na data selecionada.</p>
+              </div>
+            ) : (
+              <div className="table-wrapper">
+                <table className="table-premium">
+                  <thead>
+                    <tr>
+                      <th>Comanda</th>
+                      <th>Cliente</th>
+                      <th>Valor Total</th>
+                      <th>Data da Leitura</th>
+                      <th>Data da Exclusão</th>
+                      <th>Observações</th>
+                      <th style={{ textAlign: 'right' }}>Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {deletedDeliveries.map((item) => (
+                      <tr key={item.id}>
+                        <td style={{ fontWeight: 800, color: 'var(--danger)' }}>
+                          {item.orderNumber}
+                        </td>
+                        <td>
+                          <p style={{ fontWeight: 700 }}>{item.customerName || "Consumidor"}</p>
+                          <p style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{item.address || "Sem endereço"}</p>
+                        </td>
+                        <td style={{ fontWeight: 700, color: 'var(--text-secondary)' }}>
+                          R$ {(item.totalAmount || 0).toFixed(2)}
+                        </td>
+                        <td style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                          {item.scannedAt ? new Date(item.scannedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--'}
+                        </td>
+                        <td style={{ fontSize: '11px', color: 'var(--warning)' }}>
+                          {new Date(item.deletedAt).toLocaleDateString()} {new Date(item.deletedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </td>
+                        <td style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                          {item.observations || '--'}
+                        </td>
+                        <td style={{ textAlign: 'right' }}>
+                          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                            <button
+                              onClick={async () => {
+                                if (confirm(`Restaurar a comanda ${item.orderNumber} para as entregas ativas?`)) {
+                                  const actions = await import("@/lib/actions");
+                                  await actions.restoreDelivery(item.id);
+                                  fetchData();
+                                }
+                              }}
+                              className="btn-outline"
+                              style={{ padding: '0.4rem 0.8rem', fontSize: '11px', borderColor: 'var(--primary)', color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '4px' }}
+                              title="Restaurar comanda para entregas ativas"
+                            >
+                              <RotateCcw size={14} /> Restaurar
+                            </button>
+                            <button
+                              onClick={async () => {
+                                if (confirm(`Remover permanentemente o registro da comanda ${item.orderNumber}? (Atenção: Se ela continuar no GPlus, poderá ser re-sincronizada).`)) {
+                                  const actions = await import("@/lib/actions");
+                                  await actions.permanentDeleteDelivery(item.id);
+                                  fetchData();
+                                }
+                              }}
+                              style={{ padding: '0.4rem 0.8rem', background: 'rgba(255,45,85,0.15)', border: '1px solid rgba(255,45,85,0.3)', borderRadius: '6px', color: 'var(--danger)', fontSize: '11px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                              title="Excluir registro permanentemente"
+                            >
+                              <Trash2 size={14} /> Excluir
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );

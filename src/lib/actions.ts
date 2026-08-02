@@ -205,18 +205,85 @@ export async function bulkAssignDeliveries(deliveryIds: string[], newDriverId: s
 export async function deleteDelivery(id: string) {
   const delivery = await prisma.delivery.findUnique({
     where: { id },
-    select: { orderNumber: true },
   });
 
-  if (delivery?.orderNumber) {
+  if (delivery) {
     await prisma.deletedDelivery.create({
-      data: { orderNumber: delivery.orderNumber },
+      data: {
+        orderNumber: delivery.orderNumber,
+        customerName: delivery.customerName,
+        address: delivery.address,
+        totalAmount: delivery.totalAmount,
+        deliveryFee: delivery.deliveryFee,
+        status: delivery.status,
+        deliveryPerson: delivery.deliveryPerson,
+        paymentMethod: delivery.paymentMethod,
+        observations: delivery.observations,
+        itemsCount: delivery.itemsCount,
+        scannedAt: delivery.scannedAt,
+      },
     });
+
+    await prisma.delivery.delete({ where: { id } });
   }
 
-  await prisma.delivery.delete({ where: { id } });
   revalidatePath("/restaurant");
   revalidatePath("/driver");
+}
+
+export async function getDeletedDeliveries(dateStr?: string) {
+  let where = {};
+  if (dateStr) {
+    const start = new Date(dateStr);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(dateStr);
+    end.setHours(23, 59, 59, 999);
+    where = {
+      deletedAt: {
+        gte: start,
+        lte: end
+      }
+    };
+  }
+
+  return prisma.deletedDelivery.findMany({
+    where,
+    orderBy: { deletedAt: 'desc' },
+  });
+}
+
+export async function restoreDelivery(id: string) {
+  const deleted = await prisma.deletedDelivery.findUnique({
+    where: { id },
+  });
+
+  if (deleted) {
+    await prisma.delivery.create({
+      data: {
+        orderNumber: deleted.orderNumber,
+        customerName: deleted.customerName || "Consumidor",
+        address: deleted.address || "Não informado",
+        totalAmount: deleted.totalAmount || 0,
+        deliveryFee: deleted.deliveryFee || 0,
+        status: deleted.status || "PENDENTE",
+        deliveryPerson: deleted.deliveryPerson,
+        paymentMethod: deleted.paymentMethod,
+        observations: deleted.observations,
+        itemsCount: deleted.itemsCount || 1,
+        scannedAt: deleted.scannedAt || new Date(),
+      },
+    });
+
+    await prisma.deletedDelivery.delete({ where: { id } });
+  }
+
+  revalidatePath("/restaurant");
+  revalidatePath("/driver");
+}
+
+export async function permanentDeleteDelivery(id: string) {
+  await prisma.deletedDelivery.delete({ where: { id } });
+  revalidatePath("/restaurant");
 }
 
 export async function clearDeliveries() {
