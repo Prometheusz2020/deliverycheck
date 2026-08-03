@@ -231,19 +231,27 @@ export async function deleteDelivery(id: string) {
   revalidatePath("/driver");
 }
 
+function parseDateRange(dateStr?: string) {
+  if (!dateStr) return undefined;
+  const parts = dateStr.split('-').map(Number);
+  if (parts.length === 3 && !isNaN(parts[0]) && !isNaN(parts[1]) && !isNaN(parts[2])) {
+    const [year, month, day] = parts;
+    const start = new Date(year, month - 1, day, 0, 0, 0, 0);
+    const end = new Date(year, month - 1, day, 23, 59, 59, 999);
+    return { gte: start, lte: end };
+  }
+  const start = new Date(dateStr);
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(dateStr);
+  end.setHours(23, 59, 59, 999);
+  return { gte: start, lte: end };
+}
+
 export async function getDeletedDeliveries(dateStr?: string) {
-  let where = {};
-  if (dateStr) {
-    const start = new Date(dateStr);
-    start.setHours(0, 0, 0, 0);
-    const end = new Date(dateStr);
-    end.setHours(23, 59, 59, 999);
-    where = {
-      deletedAt: {
-        gte: start,
-        lte: end
-      }
-    };
+  let where: any = {};
+  const range = parseDateRange(dateStr);
+  if (range) {
+    where.deletedAt = range;
   }
 
   return prisma.deletedDelivery.findMany({
@@ -335,18 +343,10 @@ export async function updateObservations(id: string, text: string) {
 }
 
 export async function getDeliveries(dateStr?: string) {
-  let where = {};
-  if (dateStr) {
-    const start = new Date(dateStr);
-    start.setHours(0, 0, 0, 0);
-    const end = new Date(dateStr);
-    end.setHours(23, 59, 59, 999);
-    where = {
-      scannedAt: {
-        gte: start,
-        lte: end
-      }
-    };
+  let where: any = {};
+  const range = parseDateRange(dateStr);
+  if (range) {
+    where.scannedAt = range;
   }
 
   return prisma.delivery.findMany({
@@ -357,18 +357,10 @@ export async function getDeliveries(dateStr?: string) {
 }
 
 export async function getSummary(dateStr?: string) {
-  let where = {};
-  if (dateStr) {
-    const start = new Date(dateStr);
-    start.setHours(0, 0, 0, 0);
-    const end = new Date(dateStr);
-    end.setHours(23, 59, 59, 999);
-    where = {
-      scannedAt: {
-        gte: start,
-        lte: end
-      }
-    };
+  let where: any = {};
+  const range = parseDateRange(dateStr);
+  if (range) {
+    where.scannedAt = range;
   }
 
   const [counts, sums] = await Promise.all([

@@ -65,7 +65,7 @@ type CustomerDetailsType = {
   payments: PaymentType[];
 };
 
-export default function CreditSalesDashboard() {
+export default function CreditSalesDashboard({ selectedDate }: { selectedDate?: string } = {}) {
   const [activeTab, setActiveTab] = useState<'customers' | 'new-sale' | 'new-payment' | 'deleted'>('customers');
   const [customers, setCustomers] = useState<CustomerType[]>([]);
   const [deletedDeliveries, setDeletedDeliveries] = useState<any[]>([]);
@@ -599,12 +599,12 @@ export default function CreditSalesDashboard() {
   const fetchDeleted = useCallback(async () => {
     try {
       const actions = await import("@/lib/actions");
-      const data = await actions.getDeletedDeliveries();
+      const data = await actions.getDeletedDeliveries(selectedDate);
       setDeletedDeliveries(data as any);
     } catch (err) {
       console.error(err);
     }
-  }, []);
+  }, [selectedDate]);
 
   // Carga inicial
   useEffect(() => {

@@ -722,7 +722,7 @@ export default function RestaurantPortal() {
           </div>
         </div>
       ) : (
-        <CreditSalesDashboard />
+        <CreditSalesDashboard selectedDate={selectedDate} />
       )}
     </div>
   );
