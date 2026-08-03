@@ -110,6 +110,54 @@ export async function getCustomers() {
 
 export async function deleteCustomer(id: string) {
   try {
+    const customer = await prisma.customer.findUnique({
+      where: { id },
+      include: {
+        sales: {
+          include: {
+            items: true,
+          },
+        },
+      },
+    });
+
+    if (customer && customer.sales.length > 0) {
+      for (const sale of customer.sales) {
+        if (sale.gplusId) {
+          await prisma.deletedGPlusSale.upsert({
+            where: { gplusId: sale.gplusId },
+            create: { gplusId: sale.gplusId },
+            update: {},
+          });
+        }
+
+        const match = sale.notes?.match(/Comanda\s*#?(\d+)/i);
+        const comandaNum = match ? `#${match[1]}` : (sale.gplusId ? `#${sale.gplusId}` : `Fiado (${customer.name})`);
+
+        let itemsSummary = "";
+        if (sale.items && sale.items.length > 0) {
+          itemsSummary = sale.items.map(i => `${i.quantity}x ${i.description}`).join(', ');
+        }
+
+        const obsText = sale.notes
+          ? `${sale.notes} [Cliente ${customer.name} excluído]`
+          : (itemsSummary ? `${itemsSummary} [Cliente ${customer.name} excluído]` : `Venda fiado do cliente ${customer.name} (excluído)`);
+
+        await prisma.deletedDelivery.create({
+          data: {
+            orderNumber: comandaNum,
+            customerName: customer.name,
+            address: customer.address || "Venda a Prazo (Cliente Deletado)",
+            totalAmount: sale.totalAmount,
+            deliveryFee: 0,
+            status: "FIADO",
+            observations: obsText,
+            scannedAt: sale.date,
+          },
+        });
+      }
+    }
+
     await prisma.customer.delete({
       where: { id },
     });

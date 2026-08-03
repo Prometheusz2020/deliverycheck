@@ -1854,12 +1854,22 @@ export default function CreditSalesDashboard() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
           <div className="card-premium" style={{ borderTop: '4px solid var(--danger)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
-              <h3 style={{ color: 'var(--danger)', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
-                <Trash2 size={20} /> COMANDAS EXCLUÍDAS ({deletedDeliveries.length})
-              </h3>
-              <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                Comandas nesta lista <strong>não serão re-sincronizadas</strong> do GPlus.
-              </span>
+              <div>
+                <h3 style={{ color: 'var(--danger)', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+                  <Trash2 size={20} /> COMANDAS EXCLUÍDAS ({deletedDeliveries.length})
+                </h3>
+                <p style={{ fontSize: '11px', color: 'var(--text-muted)', margin: '4px 0 0 0' }}>
+                  Comandas nesta lista <strong>não serão re-sincronizadas</strong> do GPlus.
+                </p>
+              </div>
+              {deletedDeliveries.length > 0 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(255,45,85,0.08)', padding: '0.6rem 1rem', borderRadius: '10px', border: '1px solid rgba(255,45,85,0.2)' }}>
+                  <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-secondary)' }}>Total Geral Deletadas:</span>
+                  <span style={{ fontSize: '15px', fontWeight: 900, color: 'var(--danger)' }}>
+                    R$ {deletedDeliveries.reduce((sum, item) => sum + (item.totalAmount || 0), 0).toFixed(2)}
+                  </span>
+                </div>
+              )}
             </div>
 
             {deletedDeliveries.length === 0 ? (
@@ -1868,84 +1878,130 @@ export default function CreditSalesDashboard() {
                 <p style={{ fontSize: '14px', fontWeight: 600 }}>Nenhuma comanda excluída encontrada.</p>
               </div>
             ) : (
-              <div className="table-wrapper">
-                <table className="table-premium">
-                  <thead>
-                    <tr>
-                      <th>Comanda</th>
-                      <th>Cliente</th>
-                      <th>Valor Total</th>
-                      <th>Data do Lançamento</th>
-                      <th>Data da Exclusão</th>
-                      <th>Observações / Status</th>
-                      <th style={{ textAlign: 'right' }}>Ações</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {deletedDeliveries.map((item) => (
-                      <tr key={item.id}>
-                        <td style={{ fontWeight: 800, color: 'var(--danger)' }}>
-                          {item.orderNumber}
-                          {item.status === 'FIADO' && (
-                            <span style={{ marginLeft: '6px', fontSize: '9px', background: 'rgba(255,149,0,0.2)', color: 'var(--warning)', padding: '2px 6px', borderRadius: '4px' }}>
-                              FIADO
-                            </span>
-                          )}
-                        </td>
-                        <td>
-                          <p style={{ fontWeight: 700 }}>{item.customerName || "Consumidor"}</p>
-                          <p style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{item.address || "Sem endereço"}</p>
-                        </td>
-                        <td style={{ fontWeight: 700, color: 'var(--text-secondary)' }}>
-                          R$ {(item.totalAmount || 0).toFixed(2)}
-                        </td>
-                        <td style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                          {item.scannedAt ? new Date(item.scannedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--'}
-                        </td>
-                        <td style={{ fontSize: '11px', color: 'var(--warning)' }}>
-                          {new Date(item.deletedAt).toLocaleDateString()} {new Date(item.deletedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </td>
-                        <td style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                          {item.observations || '--'}
-                        </td>
-                        <td style={{ textAlign: 'right' }}>
-                          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-                            <button
-                              onClick={async () => {
-                                if (confirm(`Restaurar a comanda ${item.orderNumber}?`)) {
-                                  const actions = await import("@/lib/actions");
-                                  await actions.restoreDelivery(item.id);
-                                  fetchCustomers();
-                                  fetchRecentSales();
-                                  fetchDeleted();
-                                  if (selectedCustomerId) fetchDetails(selectedCustomerId);
-                                }
-                              }}
-                              className="btn-outline"
-                              style={{ padding: '0.4rem 0.8rem', fontSize: '11px', borderColor: 'var(--primary)', color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '4px' }}
-                              title="Restaurar comanda"
-                            >
-                              <RotateCcw size={14} /> Restaurar
-                            </button>
-                            <button
-                              onClick={async () => {
-                                if (confirm(`Remover permanentemente o registro da comanda ${item.orderNumber}? (Atenção: Se ela continuar no GPlus, poderá ser re-sincronizada).`)) {
-                                  const actions = await import("@/lib/actions");
-                                  await actions.permanentDeleteDelivery(item.id);
-                                  fetchDeleted();
-                                }
-                              }}
-                              style={{ padding: '0.4rem 0.8rem', background: 'rgba(255,45,85,0.15)', border: '1px solid rgba(255,45,85,0.3)', borderRadius: '6px', color: 'var(--danger)', fontSize: '11px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
-                              title="Excluir registro permanentemente"
-                            >
-                              <Trash2 size={14} /> Excluir
-                            </button>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                {/* Agrupamento por Cliente */}
+                {(() => {
+                  const groupsMap: { [key: string]: { customerName: string; address?: string; items: typeof deletedDeliveries; total: number } } = {};
+                  
+                  deletedDeliveries.forEach(item => {
+                    const name = item.customerName?.trim() || "Consumidor / Sem Cliente";
+                    if (!groupsMap[name]) {
+                      groupsMap[name] = {
+                        customerName: name,
+                        address: item.address || undefined,
+                        items: [],
+                        total: 0
+                      };
+                    }
+                    groupsMap[name].items.push(item);
+                    groupsMap[name].total += (item.totalAmount || 0);
+                  });
+
+                  const sortedGroups = Object.values(groupsMap).sort((a, b) => a.customerName.localeCompare(b.customerName));
+
+                  return sortedGroups.map(group => (
+                    <div key={group.customerName} style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '1.2rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.8rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'rgba(255, 45, 85, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--danger)' }}>
+                            <Users size={18} />
                           </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                          <div>
+                            <h4 style={{ fontSize: '15px', fontWeight: 800, color: '#fff', margin: 0, textTransform: 'uppercase' }}>
+                              {group.customerName}
+                            </h4>
+                            {group.address && (
+                              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{group.address}</span>
+                            )}
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', background: 'rgba(255,255,255,0.05)', padding: '4px 8px', borderRadius: '6px' }}>
+                            {group.items.length} {group.items.length === 1 ? 'comanda' : 'comandas'}
+                          </span>
+                          <span style={{ fontSize: '13px', fontWeight: 800, color: 'var(--danger)', background: 'rgba(255, 45, 85, 0.12)', padding: '4px 10px', borderRadius: '6px', border: '1px solid rgba(255,45,85,0.2)' }}>
+                            Subtotal: R$ {group.total.toFixed(2)}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="table-wrapper">
+                        <table className="table-premium">
+                          <thead>
+                            <tr>
+                              <th>Comanda</th>
+                              <th>Valor Total</th>
+                              <th>Data do Lançamento</th>
+                              <th>Data da Exclusão</th>
+                              <th>Observações / Status</th>
+                              <th style={{ textAlign: 'right' }}>Ações</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {group.items.map((item) => (
+                              <tr key={item.id}>
+                                <td style={{ fontWeight: 800, color: 'var(--danger)' }}>
+                                  {item.orderNumber}
+                                  {item.status === 'FIADO' && (
+                                    <span style={{ marginLeft: '6px', fontSize: '9px', background: 'rgba(255,149,0,0.2)', color: 'var(--warning)', padding: '2px 6px', borderRadius: '4px' }}>
+                                      FIADO
+                                    </span>
+                                  )}
+                                </td>
+                                <td style={{ fontWeight: 700, color: 'var(--text-secondary)' }}>
+                                  R$ {(item.totalAmount || 0).toFixed(2)}
+                                </td>
+                                <td style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                                  {item.scannedAt ? new Date(item.scannedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--'}
+                                </td>
+                                <td style={{ fontSize: '11px', color: 'var(--warning)' }}>
+                                  {new Date(item.deletedAt).toLocaleDateString()} {new Date(item.deletedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </td>
+                                <td style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                                  {item.observations || '--'}
+                                </td>
+                                <td style={{ textAlign: 'right' }}>
+                                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                                    <button
+                                      onClick={async () => {
+                                        if (confirm(`Restaurar a comanda ${item.orderNumber}?`)) {
+                                          const actions = await import("@/lib/actions");
+                                          await actions.restoreDelivery(item.id);
+                                          fetchCustomers();
+                                          fetchRecentSales();
+                                          fetchDeleted();
+                                          if (selectedCustomerId) fetchDetails(selectedCustomerId);
+                                        }
+                                      }}
+                                      className="btn-outline"
+                                      style={{ padding: '0.4rem 0.8rem', fontSize: '11px', borderColor: 'var(--primary)', color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '4px' }}
+                                      title="Restaurar comanda"
+                                    >
+                                      <RotateCcw size={14} /> Restaurar
+                                    </button>
+                                    <button
+                                      onClick={async () => {
+                                        if (confirm(`Remover permanentemente o registro da comanda ${item.orderNumber}? (Atenção: Se ela continuar no GPlus, poderá ser re-sincronizada).`)) {
+                                          const actions = await import("@/lib/actions");
+                                          await actions.permanentDeleteDelivery(item.id);
+                                          fetchDeleted();
+                                        }
+                                      }}
+                                      style={{ padding: '0.4rem 0.8rem', background: 'rgba(255,45,85,0.15)', border: '1px solid rgba(255,45,85,0.3)', borderRadius: '6px', color: 'var(--danger)', fontSize: '11px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                                      title="Excluir registro permanentemente"
+                                    >
+                                      <Trash2 size={14} /> Excluir
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  ));
+                })()}
               </div>
             )}
           </div>
