@@ -17,12 +17,27 @@ export default function RestaurantPortal() {
   const [summary, setSummary] = useState<DeliverySummary>({ 
     pending: 0, onRoute: 0, delivered: 0, totalValue: 0, totalFees: 0 
   });
-  const [activeTab, setActiveTab] = useState<'deliveries' | 'drivers' | 'creditsales'>('deliveries');
+  const [activeTab, setActiveTab] = useState<'deliveries' | 'drivers' | 'creditsales' | 'deleted'>('deliveries');
+  const [deletedSearchTerm, setDeletedSearchTerm] = useState("");
   
   const [newDriverName, setNewDriverName] = useState("");
   const [newDriverPass, setNewDriverPass] = useState("");
   const [isAddingDriver, setIsAddingDriver] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date().toLocaleDateString('sv-SE'));
+
+  const handleRestoreDeleted = async (id: string) => {
+    const actions = await import("@/lib/actions");
+    await actions.restoreDelivery(id);
+    fetchData();
+  };
+
+  const handlePermanentDelete = async (id: string) => {
+    if (confirm("Excluir esta comanda permanentemente do relatório?")) {
+      const actions = await import("@/lib/actions");
+      await actions.permanentDeleteDelivery(id);
+      fetchData();
+    }
+  };
 
   // Estados para Filtro e Seleção
   const [onlyWithAddress, setOnlyWithAddress] = useState(true);
@@ -158,6 +173,9 @@ export default function RestaurantPortal() {
             <button onClick={() => setActiveTab('creditsales')} className={activeTab === 'creditsales' ? 'btn-main' : 'btn-outline'} style={{ padding: '0.6rem 1.5rem', fontSize: '12px', borderRadius: '8px', marginLeft: '0.4rem' }}>
               <DollarSign size={16} /> Fiado / Prazo
             </button>
+            <button onClick={() => setActiveTab('deleted')} className={activeTab === 'deleted' ? 'btn-main' : 'btn-outline'} style={{ padding: '0.6rem 1.5rem', fontSize: '12px', borderRadius: '8px', marginLeft: '0.4rem', borderColor: activeTab === 'deleted' ? undefined : 'rgba(255, 45, 85, 0.3)' }}>
+              <Trash2 size={16} style={{ color: activeTab === 'deleted' ? 'inherit' : 'var(--danger)' }} /> Deletadas ({deletedDeliveries.length})
+            </button>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', background: 'var(--surface-high)', padding: '0.4rem 0.8rem', borderRadius: '12px', gap: '8px' }}>
             <Clock size={16} style={{ color: 'var(--accent)' }} />
@@ -175,7 +193,7 @@ export default function RestaurantPortal() {
         </div>
       </header>
 
-      {activeTab !== 'creditsales' && (
+      {activeTab !== 'creditsales' && activeTab !== 'deleted' && (
         <div className="grid-quarters" style={{ gridTemplateColumns: 'repeat(2, 1fr)' }}>
           {[
             { label: 'Pendentes', val: summary.pending, icon: Clock, color: 'var(--warning)' },
@@ -721,8 +739,160 @@ export default function RestaurantPortal() {
             </div>
           </div>
         </div>
-      ) : (
+      ) : activeTab === 'creditsales' ? (
         <CreditSalesDashboard selectedDate={selectedDate} />
+      ) : (
+        /* Relatório de Comandas Deletadas */
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+          {/* Cards de Métricas do Relatório */}
+          {(() => {
+            const filteredDeleted = deletedDeliveries.filter(d => {
+              if (!deletedSearchTerm) return true;
+              const term = deletedSearchTerm.toLowerCase();
+              return (
+                d.customerName?.toLowerCase().includes(term) ||
+                d.address?.toLowerCase().includes(term) ||
+                d.orderNumber?.toLowerCase().includes(term)
+              );
+            });
+
+            const totalValueDeleted = filteredDeleted.reduce((sum, d) => sum + (d.totalAmount || 0), 0);
+            const totalItemsDeleted = filteredDeleted.reduce((sum, d) => sum + (d.itemsCount || 1), 0);
+
+            return (
+              <>
+                <div className="grid-quarters" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+                  <div className="card-premium" style={{ padding: '1.5rem', borderTop: '4px solid var(--danger)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--danger)', marginBottom: '1rem' }}>
+                      <Trash2 size={24} />
+                    </div>
+                    <p style={{ color: 'var(--text-muted)', fontSize: '10px', fontWeight: 900, textTransform: 'uppercase' }}>Comandas Excluídas</p>
+                    <p style={{ fontSize: '1.8rem', fontWeight: 800 }}>{filteredDeleted.length}</p>
+                  </div>
+
+                  <div className="card-premium" style={{ padding: '1.5rem', borderTop: '4px solid var(--warning)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--warning)', marginBottom: '1rem' }}>
+                      <DollarSign size={24} />
+                    </div>
+                    <p style={{ color: 'var(--text-muted)', fontSize: '10px', fontWeight: 900, textTransform: 'uppercase' }}>Valor Total Excluído</p>
+                    <p style={{ fontSize: '1.8rem', fontWeight: 800, color: 'var(--warning)' }}>R$ {totalValueDeleted.toFixed(2)}</p>
+                  </div>
+
+                  <div className="card-premium" style={{ padding: '1.5rem', borderTop: '4px solid var(--primary)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--primary)', marginBottom: '1rem' }}>
+                      <Package size={24} />
+                    </div>
+                    <p style={{ color: 'var(--text-muted)', fontSize: '10px', fontWeight: 900, textTransform: 'uppercase' }}>Total de Marmitex / Itens</p>
+                    <p style={{ fontSize: '1.8rem', fontWeight: 800 }}>{totalItemsDeleted}</p>
+                  </div>
+                </div>
+
+                {/* Filtro de Busca */}
+                <div className="card-premium" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 1.5rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <h3 style={{ fontSize: '1.1rem', fontWeight: 800, margin: 0, color: 'var(--danger)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Trash2 size={18} /> RELATÓRIO DE COMANDAS DELETADAS
+                    </h3>
+                  </div>
+                  <input 
+                    type="text"
+                    placeholder="Buscar por cliente, endereço ou comanda..."
+                    value={deletedSearchTerm}
+                    onChange={(e) => setDeletedSearchTerm(e.target.value)}
+                    className="input-premium"
+                    style={{ maxWidth: '350px', fontSize: '12px', padding: '0.4rem 0.8rem', border: '1px solid rgba(255,255,255,0.1)' }}
+                  />
+                </div>
+
+                {/* Tabela do Relatório */}
+                <div className="card-premium">
+                  {filteredDeleted.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '3rem 1rem', color: 'var(--text-muted)' }}>
+                      <Trash2 size={36} style={{ marginBottom: '0.8rem', opacity: 0.3 }} />
+                      <p style={{ fontSize: '14px', fontWeight: 600 }}>Nenhuma comanda excluída encontrada para esta data.</p>
+                    </div>
+                  ) : (
+                    <div className="table-wrapper">
+                      <table className="table-premium">
+                        <thead>
+                          <tr>
+                            <th>Comanda</th>
+                            <th>Cliente</th>
+                            <th>Endereço / Obs</th>
+                            <th>Valor</th>
+                            <th>Status Anterior</th>
+                            <th>Excluído Em</th>
+                            <th style={{ textAlign: 'right' }}>Ações</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {filteredDeleted.map(item => (
+                            <tr key={item.id}>
+                              <td style={{ fontWeight: 800, color: 'var(--danger)' }}>{item.orderNumber}</td>
+                              <td>
+                                <p style={{ fontWeight: 700 }}>{item.customerName || 'Consumidor'}</p>
+                                {item.deliveryPerson && (
+                                  <p style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Motoboy: {item.deliveryPerson}</p>
+                                )}
+                              </td>
+                              <td>
+                                <p style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{item.address || 'Não informado'}</p>
+                                {item.observations && (
+                                  <p style={{ fontSize: '10px', color: 'var(--warning)' }}>Obs: {item.observations}</p>
+                                )}
+                              </td>
+                              <td style={{ fontWeight: 800, color: 'var(--text)' }}>
+                                R$ {(item.totalAmount || 0).toFixed(2)}
+                              </td>
+                              <td>
+                                <span style={{ 
+                                  fontSize: '9px', 
+                                  fontWeight: 900, 
+                                  padding: '0.2rem 0.6rem', 
+                                  borderRadius: '4px',
+                                  background: 'rgba(255,255,255,0.05)',
+                                  color: 'var(--text-muted)'
+                                }}>
+                                  {item.status || 'PENDENTE'}
+                                </span>
+                              </td>
+                              <td>
+                                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                                  {item.deletedAt ? new Date(item.deletedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--'}
+                                </span>
+                              </td>
+                              <td style={{ textAlign: 'right' }}>
+                                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                                  <button
+                                    onClick={() => handleRestoreDeleted(item.id)}
+                                    className="btn-outline"
+                                    title="Restaurar Comanda"
+                                    style={{ padding: '0.4rem 0.8rem', fontSize: '11px', borderColor: 'rgba(57, 255, 20, 0.3)', color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: '4px' }}
+                                  >
+                                    <RotateCcw size={12} />
+                                    Restaurar
+                                  </button>
+                                  <button
+                                    onClick={() => handlePermanentDelete(item.id)}
+                                    style={{ padding: '0.4rem 0.8rem', fontSize: '11px', background: 'rgba(255,45,85,0.1)', border: '1px solid rgba(255,45,85,0.2)', borderRadius: '6px', color: 'var(--danger)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                                    title="Excluir Definitivamente"
+                                  >
+                                    <Trash2 size={12} />
+                                    Apagar
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </>
+            );
+          })()}
+        </div>
       )}
     </div>
   );
