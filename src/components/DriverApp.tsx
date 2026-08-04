@@ -195,26 +195,65 @@ export default function DriverApp() {
   };
 
   const handleStatusUpdate = async (id: string, status: DeliveryStatus) => {
-    const actions = await import("@/lib/actions");
-    await actions.updateDeliveryStatus(id, status, driver?.id);
-    fetchData();
+    if (!driver) return;
+
+    // Atualização otimista imediata na UI (relação instantânea ao toque/clique)
+    setDeliveries(prev =>
+      prev.map(d =>
+        d.id === id
+          ? {
+              ...d,
+              status,
+              driverId: driver.id,
+              deliveryPerson: driver.name,
+            }
+          : d
+      )
+    );
+
+    try {
+      const actions = await import("@/lib/actions");
+      await actions.updateDeliveryStatus(id, status, driver.id);
+      fetchData();
+    } catch (err) {
+      console.error("Erro ao atualizar status:", err);
+      fetchData();
+      alert("Falha ao salvar no servidor. Tente novamente.");
+    }
   };
 
   const handleBulkComplete = async () => {
     if (!driver || markedDeliveryIds.length === 0) return;
     setIsCompleting(true);
+    const targetIds = [...markedDeliveryIds];
+
+    // Atualização otimista imediata na UI
+    setDeliveries(prev =>
+      prev.map(d =>
+        targetIds.includes(d.id)
+          ? {
+              ...d,
+              status: "ENTREGUE" as DeliveryStatus,
+              deliveredAt: new Date(),
+            }
+          : d
+      )
+    );
+    setMarkedDeliveryIds([]);
+
     try {
       const actions = await import("@/lib/actions");
-      const res = await actions.bulkCompleteDeliveries(markedDeliveryIds, driver.id);
-      if (res.success) {
-        setMarkedDeliveryIds([]);
+      const res = await actions.bulkCompleteDeliveries(targetIds, driver.id);
+      if (!res.success) {
+        alert("Erro ao confirmar entregas.");
         fetchData();
       } else {
-        alert("Erro ao confirmar entregas.");
+        fetchData();
       }
     } catch (err) {
       console.error(err);
       alert("Erro de conexão.");
+      fetchData();
     } finally {
       setIsCompleting(false);
     }
