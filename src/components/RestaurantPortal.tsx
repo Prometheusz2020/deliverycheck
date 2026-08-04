@@ -238,8 +238,99 @@ export default function RestaurantPortal() {
               }
             };
 
+            const driverReport = drivers.map(dr => {
+              const drDeliveries = deliveries.filter(
+                d => d.driverId === dr.id || (d.deliveryPerson && d.deliveryPerson.toLowerCase() === dr.name.toLowerCase())
+              );
+              const delivered = drDeliveries.filter(d => d.status === 'ENTREGUE');
+              const onRoute = drDeliveries.filter(d => d.status === 'EM ROTA');
+              const totalItems = delivered.reduce((sum, d) => sum + (d.itemsCount || 1), 0);
+              const totalAmount = delivered.reduce((sum, d) => sum + (d.totalAmount || 0), 0);
+
+              return {
+                id: dr.id,
+                name: dr.name,
+                isActive: dr.isActive,
+                deliveredCount: delivered.length,
+                onRouteCount: onRoute.length,
+                totalItems,
+                totalAmount,
+                feesEarned: dr.totalFeesEarned || 0,
+              };
+            });
+
+            const totalDeliveredToday = driverReport.reduce((sum, r) => sum + r.deliveredCount, 0);
+            const totalOnRouteToday = driverReport.reduce((sum, r) => sum + r.onRouteCount, 0);
+
             return (
               <>
+                {/* Relatório de Entregas por Motoboy */}
+                <div className="card-premium animate-entrance" style={{ borderTop: '4px solid var(--accent)', padding: '1.5rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.2rem', flexWrap: 'wrap', gap: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <Users size={20} style={{ color: 'var(--accent)' }} />
+                      <h3 style={{ fontSize: '1.1rem', fontWeight: 900, margin: 0, color: '#fff', letterSpacing: '0.05em' }}>
+                        RELATÓRIO DE ENTREGAS POR MOTOBOY
+                      </h3>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '12px', fontWeight: 700 }}>
+                      <span style={{ color: 'var(--text-muted)' }}>
+                        Concluídas: <strong style={{ color: 'var(--success)' }}>{totalDeliveredToday}</strong>
+                      </span>
+                      <span style={{ color: 'var(--text-muted)' }}>•</span>
+                      <span style={{ color: 'var(--text-muted)' }}>
+                        Em Rota: <strong style={{ color: 'var(--primary)' }}>{totalOnRouteToday}</strong>
+                      </span>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '1rem' }}>
+                    {driverReport.map(dr => (
+                      <div key={dr.id} style={{
+                        background: dr.deliveredCount > 0 || dr.onRouteCount > 0 ? 'rgba(57, 255, 20, 0.03)' : 'rgba(255, 255, 255, 0.02)',
+                        border: '1px solid rgba(255, 255, 255, 0.06)',
+                        borderRadius: '14px',
+                        padding: '1rem 1.2rem',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '6px'
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '6px' }}>
+                          <span style={{ fontWeight: 900, fontSize: '1.1rem', color: dr.isActive ? '#fff' : 'var(--text-muted)' }}>
+                            {dr.name.toUpperCase()}
+                          </span>
+                          <span style={{ 
+                            fontSize: '9px', 
+                            fontWeight: 900, 
+                            padding: '2px 6px', 
+                            borderRadius: '4px', 
+                            background: dr.isActive ? 'rgba(57, 255, 20, 0.12)' : 'rgba(255,255,255,0.05)', 
+                            color: dr.isActive ? 'var(--accent)' : 'var(--text-muted)' 
+                          }}>
+                            {dr.isActive ? 'ATIVO' : 'INATIVO'}
+                          </span>
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '4px' }}>
+                          <div style={{ background: 'rgba(52, 199, 89, 0.06)', padding: '0.4rem 0.6rem', borderRadius: '8px', textAlign: 'center' }}>
+                            <p style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 900, margin: 0 }}>Entregues</p>
+                            <p style={{ fontSize: '1.5rem', fontWeight: 900, color: 'var(--success)', margin: '2px 0 0 0', lineHeight: 1 }}>{dr.deliveredCount}</p>
+                          </div>
+                          <div style={{ background: 'rgba(0, 122, 255, 0.06)', padding: '0.4rem 0.6rem', borderRadius: '8px', textAlign: 'center' }}>
+                            <p style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 900, margin: 0 }}>Em Rota</p>
+                            <p style={{ fontSize: '1.5rem', fontWeight: 900, color: 'var(--primary)', margin: '2px 0 0 0', lineHeight: 1 }}>{dr.onRouteCount}</p>
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px', paddingTop: '6px', borderTop: '1px dashed rgba(255,255,255,0.05)', fontSize: '11px' }}>
+                          <span style={{ color: 'var(--text-muted)' }}>Marmitex: <strong style={{ color: '#fff' }}>{dr.totalItems}</strong></span>
+                          <span style={{ color: 'var(--text-muted)' }}>Total: <strong style={{ color: 'var(--success)' }}>R$ {dr.totalAmount.toFixed(2)}</strong></span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
                 <div className="card-premium" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
                     <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)' }}>
