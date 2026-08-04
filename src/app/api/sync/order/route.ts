@@ -55,10 +55,27 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: true, message: "Ignorado por ser consumo local/balcão (sem endereço)" });
     }
 
-    // Busca pedido de hoje com o mesmo número para evitar duplicidade ou atualizar dados
+    // Valida se a data do pedido é de hoje (evita que comandas retroativas criem entregas hoje)
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
+    if (order.date) {
+      let orderDate: Date;
+      if (typeof order.date === "string") {
+        const datePart = order.date.split("T")[0];
+        const [year, month, day] = datePart.split("-").map(Number);
+        orderDate = new Date(year, month - 1, day, 0, 0, 0, 0);
+      } else {
+        orderDate = new Date(order.date);
+        orderDate.setHours(0, 0, 0, 0);
+      }
+
+      if (orderDate < today) {
+        return NextResponse.json({ success: true, message: "Ignorado por não ser uma entrega de hoje" });
+      }
+    }
+
+    // Busca pedido de hoje com o mesmo número para evitar duplicidade ou atualizar dados
     const existing = await prisma.delivery.findFirst({
       where: {
         orderNumber: order.orderNumber,

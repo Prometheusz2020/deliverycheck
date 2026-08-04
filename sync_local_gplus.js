@@ -30,12 +30,12 @@ const daysArgIndex = args.indexOf('--days');
 const customDays = daysArgIndex !== -1 && args[daysArgIndex + 1] ? parseInt(args[daysArgIndex + 1]) : null;
 const daysBack = customDays || (isFullSync ? 30 : 0);
 
-const getDateWhereClause = (overrideDays = null) => {
-    const effectiveDays = overrideDays !== null ? overrideDays : daysBack;
-    if (effectiveDays > 0) {
-        return `V.DATA_VENDA >= CURRENT_DATE - ${effectiveDays}`;
+const getDeliveryDateWhereClause = () => {
+    if (customDays || isFullSync) {
+        const days = customDays || 30;
+        return `V.DATA_VENDA >= CURRENT_DATE - ${days}`;
     }
-    return `(V.DATA_VENDA = CURRENT_DATE OR V.DATA_HORA_ULTIMA_ALTERACAO >= CURRENT_TIMESTAMP - 1)`;
+    return `V.DATA_VENDA = CURRENT_DATE`;
 };
 
 function hasValidAddress(logradouro) {
@@ -58,7 +58,7 @@ function hasValidAddress(logradouro) {
 }
 
 async function syncAllOrdersFromToday(overrideDays = null) {
-    console.log(`[${new Date().toLocaleTimeString()}] Iniciando verificação de novos pedidos...`);
+    console.log(`[${new Date().toLocaleTimeString()}] Iniciando verificação de novos pedidos do dia...`);
     
     Firebird.attach(fbOptions, (err, db) => {
         if (err) {
@@ -75,13 +75,14 @@ async function syncAllOrdersFromToday(overrideDays = null) {
                 E.NUMERO AS NUMERO_CASA,
                 E.BAIRRO,
                 V.VALOR_FINAL,
+                V.DATA_VENDA,
                 COALESCE(V.CUPOM_CANCELADO, 'N') AS CANCELADO,
                 COALESCE(V.STATUS_VENDA, 'N') AS STATUS_VENDA,
                 COALESCE(V.TOT_QTD, 1) AS QUANTIDADE_ITENS
             FROM ECF_VENDA_CABECALHO V
             LEFT JOIN ECF_VENDA_COMANDA C ON (C.ID_VENDA_CABECALHO = V.ID)
             LEFT JOIN ENDERECO E ON (E.ID = V.ID_ENDERECO)
-            WHERE ${getDateWhereClause(overrideDays)}
+            WHERE ${getDeliveryDateWhereClause()}
         `;
 
         db.query(sql, async (err, result) => {
@@ -140,7 +141,8 @@ async function syncAllOrdersFromToday(overrideDays = null) {
                     address: finalAddress,
                     totalAmount: totalAmount,
                     status: isCanceled ? 'CANCELADO' : 'PENDENTE',
-                    itemsCount: itemsCount
+                    itemsCount: itemsCount,
+                    date: row.DATA_VENDA
                 };
 
                 try {
@@ -163,6 +165,14 @@ async function syncAllOrdersFromToday(overrideDays = null) {
         });
     });
 }
+
+const getFiadoDateWhereClause = (overrideDays = null) => {
+    const effectiveDays = overrideDays !== null ? overrideDays : daysBack;
+    if (effectiveDays > 0) {
+        return `V.DATA_VENDA >= CURRENT_DATE - ${effectiveDays}`;
+    }
+    return `(V.DATA_VENDA = CURRENT_DATE OR V.DATA_HORA_ULTIMA_ALTERACAO >= CURRENT_TIMESTAMP - 1)`;
+};
 
 async function syncFiadoOrdersFromToday(overrideDays = null) {
     console.log(`[${new Date().toLocaleTimeString()}] Iniciando verificação de vendas a prazo (FIADO)...`);
@@ -188,7 +198,7 @@ async function syncFiadoOrdersFromToday(overrideDays = null) {
             LEFT JOIN ECF_VENDA_COMANDA C ON (C.ID_VENDA_CABECALHO = V.ID)
             JOIN ECF_TOTAL_TIPO_PAGAMENTO P ON (P.ID_ECF_VENDA_CABECALHO = V.ID)
             JOIN ECF_TIPO_PAGAMENTO TP ON (TP.ID = P.ID_ECF_TIPO_PAGAMENTO)
-            WHERE ${getDateWhereClause(overrideDays)}
+            WHERE ${getFiadoDateWhereClause(overrideDays)}
               AND COALESCE(P.EXCLUIDO, 'N') <> 'S'
         `;
 
@@ -202,7 +212,7 @@ async function syncFiadoOrdersFromToday(overrideDays = null) {
             FROM ECF_VENDA_DETALHE D
             LEFT JOIN PRODUTO P ON (P.ID = D.ID_ECF_PRODUTO)
             JOIN ECF_VENDA_CABECALHO V ON (V.ID = D.ID_ECF_VENDA_CABECALHO)
-            WHERE ${getDateWhereClause(overrideDays)}
+            WHERE ${getFiadoDateWhereClause(overrideDays)}
               AND COALESCE(D.CANCELADO, 'N') <> 'S'
         `;
 
@@ -317,9 +327,9 @@ function checkScheduledMorningSync() {
 
 function runAllSyncJobs(overrideDays = null) {
     if (overrideDays) {
-        console.log(`[+] Executando Sincronização Retroativa Matinal de ${overrideDays} dias...`);
+        console.log(`[+] Executando Sincronização Retroativa Matinal de FIADO (${overrideDays} dias)...`);
     }
-    syncAllOrdersFromToday(overrideDays);
+    syncAllOrdersFromToday();
     // Roda a sincronização de FIADO 3 segundos depois da de entregas para evitar concorrência direta
     setTimeout(() => syncFiadoOrdersFromToday(overrideDays), 3000);
 }
