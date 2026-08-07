@@ -330,18 +330,18 @@ export default function CreditSalesDashboard({ selectedDate }: { selectedDate?: 
           lines.push(format40Line(`${dateStr} (${p.paymentMethod})`, `R$ ${p.amount.toFixed(2)}`));
         });
       }
+      lines.push("-----------------------------------");
+      lines.push(format40Line("TOTAL COMPRAS:", `R$ ${customerDetails.totalSales.toFixed(2)}`));
+      lines.push(format40Line("TOTAL PAGOS:", `R$ ${customerDetails.totalPayments.toFixed(2)}`));
     }
 
-    lines.push("-----------------------------------");
-    lines.push(format40Line("TOTAL COMPRAS:", `R$ ${customerDetails.totalSales.toFixed(2)}`));
-    lines.push(format40Line("TOTAL PAGOS:", `R$ ${customerDetails.totalPayments.toFixed(2)}`));
     lines.push("===================================");
     lines.push(format40Line("SALDO DEVEDOR ATUAL:", `R$ ${customerDetails.balance.toFixed(2)}`));
     lines.push("===================================");
-    lines.push("\nAssinatura do Cliente:\n\n");
+    lines.push("\nAssinatura do Cliente:\n\n\n");
     lines.push("___________________________________");
     lines.push(padCenter(customerDetails.name.toUpperCase()));
-    lines.push("\n\n\n");
+    lines.push("\n\n\n\n\n\n\n");
 
     setPrintModal({
       title: showPaid ? `Extrato Completo - ${customerDetails.name}` : `Extrato Em Aberto - ${customerDetails.name}`,
