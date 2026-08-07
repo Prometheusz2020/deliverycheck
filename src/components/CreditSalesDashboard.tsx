@@ -208,6 +208,10 @@ export default function CreditSalesDashboard({ selectedDate }: { selectedDate?: 
 
   // Opção para incluir ou ocultar comandas pagas no relatório de extrato
   const [includePaidInPrint, setIncludePaidInPrint] = useState(false);
+  // Opção para incluir ou ocultar histórico de pagamentos no relatório de extrato impresso
+  const [includePaymentsInPrint, setIncludePaymentsInPrint] = useState(false);
+  // Opção para incluir ou ocultar histórico de pagamentos na tela
+  const [includePaymentsInUI, setIncludePaymentsInUI] = useState(false);
   // Opção para filtrar lista de compras na tela (todas vs apenas em aberto)
   const [salesFilterInUI, setSalesFilterInUI] = useState<'todas' | 'pendentes'>('todas');
 
@@ -217,6 +221,7 @@ export default function CreditSalesDashboard({ selectedDate }: { selectedDate?: 
     lines: string[];
     isCustomerLedger?: boolean;
     includePaid?: boolean;
+    includePayments?: boolean;
   } | null>(null);
 
   // Auxiliares para formatação de 37 colunas em impressora térmica (Elgin i9)
@@ -272,9 +277,10 @@ export default function CreditSalesDashboard({ selectedDate }: { selectedDate?: 
   };
 
   // 2. Extrato Completo ou Em Aberto do Cliente Selecionado
-  const handlePrintCustomerLedger = (overrideIncludePaid?: boolean) => {
+  const handlePrintCustomerLedger = (overrideIncludePaid?: boolean, overrideIncludePayments?: boolean) => {
     if (!customerDetails) return;
     const showPaid = overrideIncludePaid !== undefined ? overrideIncludePaid : includePaidInPrint;
+    const showPayments = overrideIncludePayments !== undefined ? overrideIncludePayments : includePaymentsInPrint;
     const nowStr = new Date().toLocaleString('pt-BR');
 
     // Filtrar comandas: se showPaid for falso, oculta comandas totalmente pagas
@@ -313,15 +319,17 @@ export default function CreditSalesDashboard({ selectedDate }: { selectedDate?: 
       });
     }
 
-    lines.push("-----------------------------------");
-    lines.push("HISTORICO DE PAGAMENTOS:");
-    if (customerDetails.payments.length === 0) {
-      lines.push("  (Nenhum pagamento efetuado)");
-    } else {
-      customerDetails.payments.forEach(p => {
-        const dateStr = formatDate(p.date);
-        lines.push(format40Line(`${dateStr} (${p.paymentMethod})`, `R$ ${p.amount.toFixed(2)}`));
-      });
+    if (showPayments) {
+      lines.push("-----------------------------------");
+      lines.push("HISTORICO DE PAGAMENTOS:");
+      if (customerDetails.payments.length === 0) {
+        lines.push("  (Nenhum pagamento efetuado)");
+      } else {
+        customerDetails.payments.forEach(p => {
+          const dateStr = formatDate(p.date);
+          lines.push(format40Line(`${dateStr} (${p.paymentMethod})`, `R$ ${p.amount.toFixed(2)}`));
+        });
+      }
     }
 
     lines.push("-----------------------------------");
@@ -339,7 +347,8 @@ export default function CreditSalesDashboard({ selectedDate }: { selectedDate?: 
       title: showPaid ? `Extrato Completo - ${customerDetails.name}` : `Extrato Em Aberto - ${customerDetails.name}`,
       lines,
       isCustomerLedger: true,
-      includePaid: showPaid
+      includePaid: showPaid,
+      includePayments: showPayments
     });
   };
 
@@ -1309,9 +1318,9 @@ export default function CreditSalesDashboard({ selectedDate }: { selectedDate?: 
                     {/* Bloco de saldos */}
                     <div style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.05)', padding: '1rem 1.5rem', borderRadius: '12px', textAlign: 'right' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px', gap: '12px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                           <button 
-                            onClick={() => handlePrintCustomerLedger(includePaidInPrint)}
+                            onClick={() => handlePrintCustomerLedger(includePaidInPrint, includePaymentsInPrint)}
                             className="btn-outline"
                             style={{ padding: '0.3rem 0.6rem', fontSize: '10px', gap: '4px', display: 'flex', alignItems: 'center' }}
                             title="Imprimir Extrato do Cliente na Elgin i9 (40 colunas)"
@@ -1326,6 +1335,15 @@ export default function CreditSalesDashboard({ selectedDate }: { selectedDate?: 
                               style={{ cursor: 'pointer', accentColor: 'var(--primary)' }}
                             />
                             Incluir pagas
+                          </label>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px', color: 'var(--text-muted)', cursor: 'pointer', userSelect: 'none' }}>
+                            <input 
+                              type="checkbox"
+                              checked={includePaymentsInPrint}
+                              onChange={(e) => setIncludePaymentsInPrint(e.target.checked)}
+                              style={{ cursor: 'pointer', accentColor: 'var(--primary)' }}
+                            />
+                            Imprimir pagamentos
                           </label>
                         </div>
                         <p style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: 900, textTransform: 'uppercase', margin: 0 }}>Saldo Devedor Atual</p>
@@ -1374,7 +1392,18 @@ export default function CreditSalesDashboard({ selectedDate }: { selectedDate?: 
                   )}
 
                   {/* GRID DO EXTRATO: COMPRAS VS PAGAMENTOS */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '8px' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: 'var(--text-secondary)', cursor: 'pointer', userSelect: 'none', background: 'rgba(0,0,0,0.2)', padding: '4px 10px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                      <input 
+                        type="checkbox"
+                        checked={includePaymentsInUI}
+                        onChange={(e) => setIncludePaymentsInUI(e.target.checked)}
+                        style={{ cursor: 'pointer', accentColor: 'var(--primary)' }}
+                      />
+                      Exibir Histórico de Pagamentos na Tela
+                    </label>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: includePaymentsInUI ? '1fr 1fr' : '1fr', gap: '1.5rem' }}>
                     
                     {/* COLUNA COMPRAS */}
                     <div>
@@ -1503,49 +1532,51 @@ export default function CreditSalesDashboard({ selectedDate }: { selectedDate?: 
                     </div>
 
                     {/* COLUNA PAGAMENTOS */}
-                    <div>
-                      <h3 style={{ fontSize: '12px', color: 'var(--accent)', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <CheckCircle size={14} /> HISTÓRICO DE PAGAMENTOS
-                      </h3>
+                    {includePaymentsInUI && (
+                      <div>
+                        <h3 style={{ fontSize: '12px', color: 'var(--accent)', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <CheckCircle size={14} /> HISTÓRICO DE PAGAMENTOS
+                        </h3>
 
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '400px', overflowY: 'auto' }}>
-                        {customerDetails.payments.length === 0 ? (
-                          <p style={{ color: 'var(--text-muted)', fontSize: '11px', fontStyle: 'italic' }}>Nenhum pagamento efetuado.</p>
-                        ) : (
-                          customerDetails.payments.map(payment => (
-                            <div key={payment.id} style={{ background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.04)', padding: '10px 12px', borderRadius: '8px', position: 'relative' }}>
-                              <div style={{ position: 'absolute', top: '8px', right: '8px', display: 'flex', gap: '6px' }}>
-                                <button 
-                                  onClick={() => handlePrintPaymentTicket(payment)}
-                                  style={{ background: 'none', border: 'none', color: 'var(--accent)', opacity: 0.8, cursor: 'pointer' }}
-                                  title="Imprimir Recibo de Pagamento (40 colunas)"
-                                >
-                                  <Printer size={12} />
-                                </button>
-                                <button 
-                                  onClick={() => handleDeletePayment(payment.id)}
-                                  style={{ background: 'none', border: 'none', color: 'var(--danger)', opacity: 0.6, cursor: 'pointer' }}
-                                  title="Excluir Pagamento"
-                                >
-                                  <Trash2 size={12} />
-                                </button>
-                              </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '400px', overflowY: 'auto' }}>
+                          {customerDetails.payments.length === 0 ? (
+                            <p style={{ color: 'var(--text-muted)', fontSize: '11px', fontStyle: 'italic' }}>Nenhum pagamento efetuado.</p>
+                          ) : (
+                            customerDetails.payments.map(payment => (
+                              <div key={payment.id} style={{ background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.04)', padding: '10px 12px', borderRadius: '8px', position: 'relative' }}>
+                                <div style={{ position: 'absolute', top: '8px', right: '8px', display: 'flex', gap: '6px' }}>
+                                  <button 
+                                    onClick={() => handlePrintPaymentTicket(payment)}
+                                    style={{ background: 'none', border: 'none', color: 'var(--accent)', opacity: 0.8, cursor: 'pointer' }}
+                                    title="Imprimir Recibo de Pagamento (40 colunas)"
+                                  >
+                                    <Printer size={12} />
+                                  </button>
+                                  <button 
+                                    onClick={() => handleDeletePayment(payment.id)}
+                                    style={{ background: 'none', border: 'none', color: 'var(--danger)', opacity: 0.6, cursor: 'pointer' }}
+                                    title="Excluir Pagamento"
+                                  >
+                                    <Trash2 size={12} />
+                                  </button>
+                                </div>
 
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{formatDate(payment.date)}</span>
-                                <span style={{ fontSize: '12px', fontWeight: 800, color: 'var(--accent)', marginRight: '16px' }}>
-                                  R$ {payment.amount.toFixed(2)}
-                                </span>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{formatDate(payment.date)}</span>
+                                  <span style={{ fontSize: '12px', fontWeight: 800, color: 'var(--accent)', marginRight: '16px' }}>
+                                    R$ {payment.amount.toFixed(2)}
+                                  </span>
+                                </div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: 'var(--text-secondary)' }}>
+                                  <span style={{ textTransform: 'uppercase', fontWeight: 'bold' }}>{payment.paymentMethod}</span>
+                                  {payment.notes && <span style={{ fontStyle: 'italic', color: 'var(--text-muted)' }}>{payment.notes}</span>}
+                                </div>
                               </div>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: 'var(--text-secondary)' }}>
-                                <span style={{ textTransform: 'uppercase', fontWeight: 'bold' }}>{payment.paymentMethod}</span>
-                                {payment.notes && <span style={{ fontStyle: 'italic', color: 'var(--text-muted)' }}>{payment.notes}</span>}
-                              </div>
-                            </div>
-                          ))
-                        )}
+                            ))
+                          )}
+                        </div>
                       </div>
-                    </div>
+                    )}
 
                   </div>
                 </div>
@@ -2051,54 +2082,95 @@ export default function CreditSalesDashboard({ selectedDate }: { selectedDate?: 
               Pré-visualização ajustada para papel 80mm Elgin i9 (37 colunas):
             </p>
 
-            {/* SE FOR EXTRATO DO CLIENTE: CONTROLE DE FILTRO DE COMANDAS PAGAS */}
+            {/* SE FOR EXTRATO DO CLIENTE: CONTROLE DE FILTRO DE COMANDAS PAGAS E PAGAMENTOS */}
             {printModal.isCustomerLedger && (
               <div style={{ 
                 display: "flex", 
+                flexDirection: "column",
                 gap: "8px", 
-                alignItems: "center", 
-                justifyContent: "space-between",
                 background: "rgba(0, 0, 0, 0.3)", 
                 padding: "8px 12px", 
                 borderRadius: "8px",
                 border: "1px solid rgba(255, 255, 255, 0.05)"
               }}>
-                <span style={{ fontSize: "11px", color: "var(--text-muted)", fontWeight: 600 }}>Imprimir comandas:</span>
-                <div style={{ display: "flex", gap: "6px" }}>
-                  <button
-                    type="button"
-                    onClick={() => handlePrintCustomerLedger(false)}
-                    style={{
-                      padding: "4px 10px",
-                      fontSize: "11px",
-                      borderRadius: "6px",
-                      border: "none",
-                      cursor: "pointer",
-                      background: !printModal.includePaid ? "var(--primary)" : "rgba(255,255,255,0.06)",
-                      color: !printModal.includePaid ? "#000" : "var(--text-muted)",
-                      fontWeight: 800,
-                      transition: "all 0.15s ease"
-                    }}
-                  >
-                    Apenas Em Aberto
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handlePrintCustomerLedger(true)}
-                    style={{
-                      padding: "4px 10px",
-                      fontSize: "11px",
-                      borderRadius: "6px",
-                      border: "none",
-                      cursor: "pointer",
-                      background: printModal.includePaid ? "var(--primary)" : "rgba(255,255,255,0.06)",
-                      color: printModal.includePaid ? "#000" : "var(--text-muted)",
-                      fontWeight: 800,
-                      transition: "all 0.15s ease"
-                    }}
-                  >
-                    Incluir Pagas (Total)
-                  </button>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <span style={{ fontSize: "11px", color: "var(--text-muted)", fontWeight: 600 }}>Imprimir comandas:</span>
+                  <div style={{ display: "flex", gap: "6px" }}>
+                    <button
+                      type="button"
+                      onClick={() => handlePrintCustomerLedger(false, printModal.includePayments)}
+                      style={{
+                        padding: "4px 10px",
+                        fontSize: "11px",
+                        borderRadius: "6px",
+                        border: "none",
+                        cursor: "pointer",
+                        background: !printModal.includePaid ? "var(--primary)" : "rgba(255,255,255,0.06)",
+                        color: !printModal.includePaid ? "#000" : "var(--text-muted)",
+                        fontWeight: 800,
+                        transition: "all 0.15s ease"
+                      }}
+                    >
+                      Apenas Em Aberto
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handlePrintCustomerLedger(true, printModal.includePayments)}
+                      style={{
+                        padding: "4px 10px",
+                        fontSize: "11px",
+                        borderRadius: "6px",
+                        border: "none",
+                        cursor: "pointer",
+                        background: printModal.includePaid ? "var(--primary)" : "rgba(255,255,255,0.06)",
+                        color: printModal.includePaid ? "#000" : "var(--text-muted)",
+                        fontWeight: 800,
+                        transition: "all 0.15s ease"
+                      }}
+                    >
+                      Incluir Pagas (Total)
+                    </button>
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <span style={{ fontSize: "11px", color: "var(--text-muted)", fontWeight: 600 }}>Histórico de Pagamentos:</span>
+                  <div style={{ display: "flex", gap: "6px" }}>
+                    <button
+                      type="button"
+                      onClick={() => handlePrintCustomerLedger(printModal.includePaid, false)}
+                      style={{
+                        padding: "4px 10px",
+                        fontSize: "11px",
+                        borderRadius: "6px",
+                        border: "none",
+                        cursor: "pointer",
+                        background: !printModal.includePayments ? "var(--primary)" : "rgba(255,255,255,0.06)",
+                        color: !printModal.includePayments ? "#000" : "var(--text-muted)",
+                        fontWeight: 800,
+                        transition: "all 0.15s ease"
+                      }}
+                    >
+                      Ocultar Pagamentos
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handlePrintCustomerLedger(printModal.includePaid, true)}
+                      style={{
+                        padding: "4px 10px",
+                        fontSize: "11px",
+                        borderRadius: "6px",
+                        border: "none",
+                        cursor: "pointer",
+                        background: printModal.includePayments ? "var(--primary)" : "rgba(255,255,255,0.06)",
+                        color: printModal.includePayments ? "#000" : "var(--text-muted)",
+                        fontWeight: 800,
+                        transition: "all 0.15s ease"
+                      }}
+                    >
+                      Incluir Pagamentos
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
