@@ -209,9 +209,9 @@ export default function CreditSalesDashboard({ selectedDate }: { selectedDate?: 
   // Opção para incluir ou ocultar comandas pagas no relatório de extrato
   const [includePaidInPrint, setIncludePaidInPrint] = useState(false);
   // Opção para incluir ou ocultar histórico de pagamentos no relatório de extrato impresso
-  const [includePaymentsInPrint, setIncludePaymentsInPrint] = useState(false);
+  const [includePaymentsInPrint, setIncludePaymentsInPrint] = useState(true);
   // Opção para incluir ou ocultar histórico de pagamentos na tela
-  const [includePaymentsInUI, setIncludePaymentsInUI] = useState(false);
+  const [includePaymentsInUI, setIncludePaymentsInUI] = useState(true);
   // Opção para filtrar lista de compras na tela (todas vs apenas em aberto)
   const [salesFilterInUI, setSalesFilterInUI] = useState<'todas' | 'pendentes'>('todas');
 
