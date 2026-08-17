@@ -165,9 +165,15 @@ export default function CreditSalesDashboard({ selectedDate }: { selectedDate?: 
     }
   };
 
-  // Filtros de Data para Lançamentos Fiado (Hoje / Ontem / Data Específica / Todos)
-  const [recentSalesFilter, setRecentSalesFilter] = useState<'hoje' | 'ontem' | 'custom' | 'todos'>('hoje');
+  // Filtros de Data para Lançamentos Fiado (Hoje / Ontem / Data Específica / Por Mês / Todos)
+  const [recentSalesFilter, setRecentSalesFilter] = useState<'hoje' | 'ontem' | 'custom' | 'mes' | 'todos'>('hoje');
   const [customDateFilter, setCustomDateFilter] = useState<string>(new Date().toLocaleDateString('sv-SE'));
+  const [customMonthFilter, setCustomMonthFilter] = useState<string>(new Date().toISOString().substring(0, 7));
+
+  // Opção de período para impressão do extrato do cliente
+  const [printPeriodType, setPrintPeriodType] = useState<'all' | 'date' | 'month'>('all');
+  const [printSelectedDate, setPrintSelectedDate] = useState<string>(new Date().toLocaleDateString('sv-SE'));
+  const [printSelectedMonth, setPrintSelectedMonth] = useState<string>(new Date().toISOString().substring(0, 7));
 
   // Auxiliares para filtro por data local
   const isSameDay = useCallback((dateInput: Date | string, targetDate: Date) => {
@@ -199,8 +205,17 @@ export default function CreditSalesDashboard({ selectedDate }: { selectedDate?: 
       const target = new Date(customDateFilter + 'T00:00:00');
       return recentSales.filter(s => isSameDay(s.date, target));
     }
+    if (recentSalesFilter === 'mes' && customMonthFilter) {
+      const [yearStr, monthStr] = customMonthFilter.split('-');
+      const year = parseInt(yearStr);
+      const month = parseInt(monthStr) - 1;
+      return recentSales.filter(s => {
+        const d = new Date(s.date);
+        return d.getFullYear() === year && d.getMonth() === month;
+      });
+    }
     return recentSales;
-  }, [recentSales, recentSalesFilter, customDateFilter, isSameDay, getYesterdayDate]);
+  }, [recentSales, recentSalesFilter, customDateFilter, customMonthFilter, isSameDay, getYesterdayDate]);
 
   const recentSalesSubtotal = useMemo(() => {
     return filteredRecentSales.reduce((acc, s) => acc + (s.totalAmount || 0), 0);
@@ -220,8 +235,12 @@ export default function CreditSalesDashboard({ selectedDate }: { selectedDate?: 
     title: string;
     lines: string[];
     isCustomerLedger?: boolean;
+    isRecentSales?: boolean;
     includePaid?: boolean;
     includePayments?: boolean;
+    periodType?: 'all' | 'date' | 'month';
+    selectedDate?: string;
+    selectedMonth?: string;
   } | null>(null);
 
   // Auxiliares para formatação de 37 colunas em impressora térmica (Elgin i9)
@@ -276,22 +295,122 @@ export default function CreditSalesDashboard({ selectedDate }: { selectedDate?: 
     });
   };
 
-  // 2. Extrato Completo ou Em Aberto do Cliente Selecionado
-  const handlePrintCustomerLedger = (overrideIncludePaid?: boolean, overrideIncludePayments?: boolean) => {
-    if (!customerDetails) return;
-    const showPaid = overrideIncludePaid !== undefined ? overrideIncludePaid : includePaidInPrint;
-    const showPayments = overrideIncludePayments !== undefined ? overrideIncludePayments : includePaymentsInPrint;
+  // 1b. Relatório de Lançamentos Fiado por Data ou por Mês
+  const handlePrintRecentSales = () => {
     const nowStr = new Date().toLocaleString('pt-BR');
-
-    // Filtrar comandas: se showPaid for falso, oculta comandas totalmente pagas
-    const salesToPrint = showPaid 
-      ? processedData.allocatedSales 
-      : processedData.allocatedSales.filter(s => s.allocationStatus !== 'PAGO');
+    let periodLabel = "TODOS OS LANÇAMENTOS";
+    if (recentSalesFilter === 'hoje') periodLabel = `HOJE (${new Date().toLocaleDateString('pt-BR')})`;
+    else if (recentSalesFilter === 'ontem') periodLabel = `ONTEM (${getYesterdayDate().toLocaleDateString('pt-BR')})`;
+    else if (recentSalesFilter === 'custom' && customDateFilter) {
+      const [y, m, d] = customDateFilter.split('-');
+      periodLabel = `DATA: ${d}/${m}/${y}`;
+    } else if (recentSalesFilter === 'mes' && customMonthFilter) {
+      const [y, m] = customMonthFilter.split('-');
+      const dateObj = new Date(parseInt(y), parseInt(m) - 1, 1);
+      const monthName = dateObj.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+      periodLabel = `MÊS: ${monthName.toUpperCase()}`;
+    }
 
     const lines: string[] = [
       "===================================",
       padCenter("DELIVERY CHECK / GPLUS"),
-      padCenter(showPaid ? "EXTRATO COMPLETO FIADO" : "EXTRATO DE FIADO (EM ABERTO)"),
+      padCenter("RELATORIO LANÇAMENTOS FIADO"),
+      padCenter(periodLabel),
+      `Emissão: ${nowStr}`,
+      "===================================",
+      format40Line("CLIENTE / COMANDA", "VALOR"),
+      "-----------------------------------"
+    ];
+
+    if (filteredRecentSales.length === 0) {
+      lines.push(padCenter("NENHUM LANÇAMENTO NO PERIODO"));
+    } else {
+      filteredRecentSales.forEach(s => {
+        const dateStr = new Date(s.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+        const nameClean = (s.customerName || "CLIENTE").toUpperCase();
+        lines.push(format40Line(`${dateStr} ${nameClean}`, `R$ ${s.totalAmount.toFixed(2)}`));
+        lines.push(`  Comanda #${s.orderNumber}`);
+      });
+    }
+
+    lines.push("-----------------------------------");
+    lines.push(format40Line(`TOTAL VENDAS: ${filteredRecentSales.length}`, ""));
+    lines.push(format40Line("SUBTOTAL PERIODO:", `R$ ${recentSalesSubtotal.toFixed(2)}`));
+    lines.push("===================================");
+    lines.push(padCenter("IMPRESSORA ELGIN I9 (37 COL)"));
+    lines.push("\n\n\n");
+
+    setPrintModal({
+      title: `Lançamentos Fiado (${periodLabel})`,
+      lines,
+      isRecentSales: true
+    });
+  };
+
+  // 2. Extrato Completo, Em Aberto ou Filtrado Por Data / Mês do Cliente Selecionado
+  const handlePrintCustomerLedger = (
+    overrideIncludePaid?: boolean, 
+    overrideIncludePayments?: boolean,
+    overridePeriodType?: 'all' | 'date' | 'month',
+    overrideDate?: string,
+    overrideMonth?: string
+  ) => {
+    if (!customerDetails) return;
+    const showPaid = overrideIncludePaid !== undefined ? overrideIncludePaid : includePaidInPrint;
+    const showPayments = overrideIncludePayments !== undefined ? overrideIncludePayments : includePaymentsInPrint;
+    const periodType = overridePeriodType !== undefined ? overridePeriodType : printPeriodType;
+    const targetDateStr = overrideDate !== undefined ? overrideDate : printSelectedDate;
+    const targetMonthStr = overrideMonth !== undefined ? overrideMonth : printSelectedMonth;
+
+    const nowStr = new Date().toLocaleString('pt-BR');
+
+    // Filtrar comandas por tipo de período
+    let baseSales = showPaid 
+      ? processedData.allocatedSales 
+      : processedData.allocatedSales.filter(s => s.allocationStatus !== 'PAGO');
+
+    let periodHeaderLabel = showPaid ? "EXTRATO COMPLETO FIADO" : "EXTRATO DE FIADO (EM ABERTO)";
+
+    if (periodType === 'date' && targetDateStr) {
+      const [y, m, d] = targetDateStr.split('-');
+      periodHeaderLabel = `EXTRATO FIADO (${d}/${m}/${y})`;
+      const targetDate = new Date(targetDateStr + 'T00:00:00');
+      baseSales = baseSales.filter(s => isSameDay(s.date, targetDate));
+    } else if (periodType === 'month' && targetMonthStr) {
+      const [y, m] = targetMonthStr.split('-');
+      const year = parseInt(y);
+      const month = parseInt(m) - 1;
+      const dateObj = new Date(year, month, 1);
+      const monthName = dateObj.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+      periodHeaderLabel = `EXTRATO FIADO (${monthName.toUpperCase()})`;
+      baseSales = baseSales.filter(s => {
+        const d = new Date(s.date);
+        return d.getFullYear() === year && d.getMonth() === month;
+      });
+    }
+
+    // Filtrar pagamentos por período também se showPayments for true
+    let basePayments = customerDetails.payments;
+    if (periodType === 'date' && targetDateStr) {
+      const targetDate = new Date(targetDateStr + 'T00:00:00');
+      basePayments = basePayments.filter(p => isSameDay(p.date, targetDate));
+    } else if (periodType === 'month' && targetMonthStr) {
+      const [y, m] = targetMonthStr.split('-');
+      const year = parseInt(y);
+      const month = parseInt(m) - 1;
+      basePayments = basePayments.filter(p => {
+        const d = new Date(p.date);
+        return d.getFullYear() === year && d.getMonth() === month;
+      });
+    }
+
+    const salesPeriodTotal = baseSales.reduce((sum, s) => sum + s.totalAmount, 0);
+    const paymentsPeriodTotal = basePayments.reduce((sum, p) => sum + p.amount, 0);
+
+    const lines: string[] = [
+      "===================================",
+      padCenter("DELIVERY CHECK / GPLUS"),
+      padCenter(periodHeaderLabel),
       `Data/Hora: ${nowStr}`,
       "===================================",
       `CLIENTE: ${customerDetails.name.toUpperCase()}`,
@@ -302,11 +421,11 @@ export default function CreditSalesDashboard({ selectedDate }: { selectedDate?: 
     if (customerDetails.bestPaymentDay) lines.push(`MELHOR DIA PGTO: DIA ${customerDetails.bestPaymentDay}`);
 
     lines.push("-----------------------------------");
-    lines.push(showPaid ? "HISTORICO DE COMPRAS (TODAS):" : "COMPRAS EM ABERTO (PENDENTES):");
-    if (salesToPrint.length === 0) {
-      lines.push(showPaid ? "  (Nenhuma compra registrada)" : "  (Nenhuma comanda em aberto)");
+    lines.push(periodType !== 'all' ? `COMPRAS NO PERIODO (${baseSales.length}):` : showPaid ? "HISTORICO DE COMPRAS (TODAS):" : "COMPRAS EM ABERTO (PENDENTES):");
+    if (baseSales.length === 0) {
+      lines.push("  (Nenhuma compra no período)");
     } else {
-      salesToPrint.forEach(s => {
+      baseSales.forEach(s => {
         const dateStr = formatDate(s.date);
         const statusTag = s.allocationStatus === 'PAGO' ? " (PAGO)" : s.allocationStatus === 'PARCIAL' ? " (PARCIAL)" : "";
         lines.push(format40Line(`${dateStr} Comanda${statusTag}`, `R$ ${s.totalAmount.toFixed(2)}`));
@@ -321,18 +440,21 @@ export default function CreditSalesDashboard({ selectedDate }: { selectedDate?: 
 
     if (showPayments) {
       lines.push("-----------------------------------");
-      lines.push("HISTORICO DE PAGAMENTOS:");
-      if (customerDetails.payments.length === 0) {
-        lines.push("  (Nenhum pagamento efetuado)");
+      lines.push(periodType !== 'all' ? `PAGAMENTOS NO PERIODO (${basePayments.length}):` : "HISTORICO DE PAGAMENTOS:");
+      if (basePayments.length === 0) {
+        lines.push("  (Nenhum pagamento no período)");
       } else {
-        customerDetails.payments.forEach(p => {
+        basePayments.forEach(p => {
           const dateStr = formatDate(p.date);
           lines.push(format40Line(`${dateStr} (${p.paymentMethod})`, `R$ ${p.amount.toFixed(2)}`));
         });
       }
       lines.push("-----------------------------------");
-      lines.push(format40Line("TOTAL COMPRAS:", `R$ ${customerDetails.totalSales.toFixed(2)}`));
-      lines.push(format40Line("TOTAL PAGOS:", `R$ ${customerDetails.totalPayments.toFixed(2)}`));
+      lines.push(format40Line("TOTAL COMPRAS NO PERIODO:", `R$ ${salesPeriodTotal.toFixed(2)}`));
+      lines.push(format40Line("TOTAL PAGOS NO PERIODO:", `R$ ${paymentsPeriodTotal.toFixed(2)}`));
+    } else if (periodType !== 'all') {
+      lines.push("-----------------------------------");
+      lines.push(format40Line("SUBTOTAL COMPRAS PERIODO:", `R$ ${salesPeriodTotal.toFixed(2)}`));
     }
 
     lines.push("===================================");
@@ -344,11 +466,14 @@ export default function CreditSalesDashboard({ selectedDate }: { selectedDate?: 
     lines.push("\n\n\n\n\n\n\n");
 
     setPrintModal({
-      title: showPaid ? `Extrato Completo - ${customerDetails.name}` : `Extrato Em Aberto - ${customerDetails.name}`,
+      title: `${periodHeaderLabel} - ${customerDetails.name}`,
       lines,
       isCustomerLedger: true,
       includePaid: showPaid,
-      includePayments: showPayments
+      includePayments: showPayments,
+      periodType,
+      selectedDate: targetDateStr,
+      selectedMonth: targetMonthStr
     });
   };
 
@@ -952,7 +1077,7 @@ export default function CreditSalesDashboard({ selectedDate }: { selectedDate?: 
                   Lançamentos Fiado ({filteredRecentSales.length})
                 </h3>
                 
-                {/* FILTRO DE DATAS (HOJE, ONTEM, DATA ESPECÍFICA, TODOS) */}
+                {/* FILTRO DE DATAS (HOJE, ONTEM, DATA ESPECÍFICA, POR MÊS, TODOS) */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                   <div style={{ display: 'flex', gap: '4px', background: 'rgba(0,0,0,0.4)', padding: '3px 4px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.08)' }}>
                     <button
@@ -986,6 +1111,22 @@ export default function CreditSalesDashboard({ selectedDate }: { selectedDate?: 
                       }}
                     >
                       Ontem
+                    </button>
+                    <button
+                      onClick={() => setRecentSalesFilter('mes')}
+                      style={{
+                        padding: '0.3rem 0.8rem',
+                        fontSize: '11px',
+                        borderRadius: '6px',
+                        border: 'none',
+                        cursor: 'pointer',
+                        fontWeight: recentSalesFilter === 'mes' ? 800 : 600,
+                        background: recentSalesFilter === 'mes' ? 'var(--primary)' : 'transparent',
+                        color: recentSalesFilter === 'mes' ? '#000' : 'var(--text-muted)',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      Por Mês
                     </button>
                     <button
                       onClick={() => setRecentSalesFilter('todos')}
@@ -1034,12 +1175,54 @@ export default function CreditSalesDashboard({ selectedDate }: { selectedDate?: 
                       }}
                     />
                   </div>
+
+                  {/* Seletor por Mês Específico */}
+                  {recentSalesFilter === 'mes' && (
+                    <div style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: '4px', 
+                      background: 'rgba(0, 242, 255, 0.15)', 
+                      padding: '2px 8px', 
+                      borderRadius: '8px', 
+                      border: '1px solid var(--primary)' 
+                    }}>
+                      <Calendar size={12} style={{ color: 'var(--primary)' }} />
+                      <input 
+                        type="month"
+                        value={customMonthFilter}
+                        onChange={(e) => {
+                          setCustomMonthFilter(e.target.value);
+                          setRecentSalesFilter('mes');
+                        }}
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          color: '#fff',
+                          fontSize: '11px',
+                          fontFamily: 'inherit',
+                          cursor: 'pointer',
+                          outline: 'none'
+                        }}
+                      />
+                    </div>
+                  )}
+
+                  {/* Botão de Impressão dos Lançamentos Filtrados */}
+                  <button
+                    onClick={handlePrintRecentSales}
+                    className="btn-outline"
+                    style={{ padding: '0.3rem 0.7rem', fontSize: '11px', borderRadius: '8px', gap: '4px', display: 'flex', alignItems: 'center', height: '30px' }}
+                    title="Imprimir relatório de lançamentos por data ou mês na Elgin i9"
+                  >
+                    <Printer size={12} /> Imprimir Lançamentos
+                  </button>
                 </div>
               </div>
 
               {filteredRecentSales.length === 0 ? (
                 <p style={{ color: 'var(--text-muted)', fontSize: '12px', fontStyle: 'italic', padding: '0.8rem 0', margin: 0 }}>
-                  Nenhum pedido fiado encontrado para {recentSalesFilter === 'hoje' ? 'hoje' : recentSalesFilter === 'ontem' ? 'ontem' : recentSalesFilter === 'custom' ? `a data ${customDateFilter.split('-').reverse().join('/')}` : 'este filtro'}.
+                  Nenhum pedido fiado encontrado para {recentSalesFilter === 'hoje' ? 'hoje' : recentSalesFilter === 'ontem' ? 'ontem' : recentSalesFilter === 'custom' ? `a data ${customDateFilter.split('-').reverse().join('/')}` : recentSalesFilter === 'mes' ? `o mês ${customMonthFilter.split('-').reverse().join('/')}` : 'este filtro'}.
                 </p>
               ) : (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '12px', maxHeight: '220px', overflowY: 'auto', paddingRight: '4px' }}>
@@ -1096,7 +1279,7 @@ export default function CreditSalesDashboard({ selectedDate }: { selectedDate?: 
                 alignItems: 'center' 
               }}>
                 <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  Subtotal ({recentSalesFilter === 'hoje' ? 'Hoje' : recentSalesFilter === 'ontem' ? 'Ontem' : recentSalesFilter === 'custom' ? customDateFilter.split('-').reverse().join('/') : 'Todos'} - {filteredRecentSales.length} {filteredRecentSales.length === 1 ? 'lançamento' : 'lançamentos'}):
+                  Subtotal ({recentSalesFilter === 'hoje' ? 'Hoje' : recentSalesFilter === 'ontem' ? 'Ontem' : recentSalesFilter === 'custom' ? customDateFilter.split('-').reverse().join('/') : recentSalesFilter === 'mes' ? `Mês ${customMonthFilter.split('-').reverse().join('/')}` : 'Todos'} - {filteredRecentSales.length} {filteredRecentSales.length === 1 ? 'lançamento' : 'lançamentos'}):
                 </span>
                 <span style={{ fontSize: '15px', fontWeight: 900, color: 'var(--primary)' }}>
                   R$ {recentSalesSubtotal.toFixed(2)}
@@ -1315,18 +1498,95 @@ export default function CreditSalesDashboard({ selectedDate }: { selectedDate?: 
                       </div>
                     </div>
 
-                    {/* Bloco de saldos */}
-                    <div style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.05)', padding: '1rem 1.5rem', borderRadius: '12px', textAlign: 'right' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px', gap: '12px' }}>
+                    {/* Bloco de saldos e controle de impressão */}
+                    <div style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.05)', padding: '1rem 1.5rem', borderRadius: '12px', textAlign: 'right', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                           <button 
-                            onClick={() => handlePrintCustomerLedger(includePaidInPrint, includePaymentsInPrint)}
+                            onClick={() => handlePrintCustomerLedger(includePaidInPrint, includePaymentsInPrint, printPeriodType, printSelectedDate, printSelectedMonth)}
                             className="btn-outline"
-                            style={{ padding: '0.3rem 0.6rem', fontSize: '10px', gap: '4px', display: 'flex', alignItems: 'center' }}
+                            style={{ padding: '0.35rem 0.7rem', fontSize: '11px', gap: '5px', display: 'flex', alignItems: 'center', borderRadius: '8px' }}
                             title="Imprimir Extrato do Cliente na Elgin i9 (40 colunas)"
                           >
-                            <Printer size={12} /> Imprimir Extrato
+                            <Printer size={13} /> Imprimir Extrato
                           </button>
+                          
+                          {/* Seletor de Período de Extrato */}
+                          <div style={{ display: 'flex', gap: '3px', background: 'rgba(0,0,0,0.4)', padding: '2px 4px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.08)' }}>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setPrintPeriodType('all');
+                              }}
+                              style={{
+                                padding: '2px 6px',
+                                fontSize: '10px',
+                                borderRadius: '4px',
+                                border: 'none',
+                                cursor: 'pointer',
+                                background: printPeriodType === 'all' ? 'var(--primary)' : 'transparent',
+                                color: printPeriodType === 'all' ? '#000' : 'var(--text-muted)',
+                                fontWeight: 800
+                              }}
+                            >
+                              Tudo
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setPrintPeriodType('date');
+                              }}
+                              style={{
+                                padding: '2px 6px',
+                                fontSize: '10px',
+                                borderRadius: '4px',
+                                border: 'none',
+                                cursor: 'pointer',
+                                background: printPeriodType === 'date' ? 'var(--primary)' : 'transparent',
+                                color: printPeriodType === 'date' ? '#000' : 'var(--text-muted)',
+                                fontWeight: 800
+                              }}
+                            >
+                              Por Data
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setPrintPeriodType('month');
+                              }}
+                              style={{
+                                padding: '2px 6px',
+                                fontSize: '10px',
+                                borderRadius: '4px',
+                                border: 'none',
+                                cursor: 'pointer',
+                                background: printPeriodType === 'month' ? 'var(--primary)' : 'transparent',
+                                color: printPeriodType === 'month' ? '#000' : 'var(--text-muted)',
+                                fontWeight: 800
+                              }}
+                            >
+                              Por Mês
+                            </button>
+                          </div>
+
+                          {printPeriodType === 'date' && (
+                            <input 
+                              type="date" 
+                              value={printSelectedDate}
+                              onChange={(e) => setPrintSelectedDate(e.target.value)}
+                              style={{ background: 'rgba(0,0,0,0.4)', border: '1px solid var(--primary)', color: '#fff', fontSize: '10px', padding: '2px 6px', borderRadius: '6px', cursor: 'pointer', outline: 'none' }}
+                            />
+                          )}
+
+                          {printPeriodType === 'month' && (
+                            <input 
+                              type="month" 
+                              value={printSelectedMonth}
+                              onChange={(e) => setPrintSelectedMonth(e.target.value)}
+                              style={{ background: 'rgba(0,0,0,0.4)', border: '1px solid var(--primary)', color: '#fff', fontSize: '10px', padding: '2px 6px', borderRadius: '6px', cursor: 'pointer', outline: 'none' }}
+                            />
+                          )}
+
                           <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px', color: 'var(--text-muted)', cursor: 'pointer', userSelect: 'none' }}>
                             <input 
                               type="checkbox"
@@ -2082,7 +2342,7 @@ export default function CreditSalesDashboard({ selectedDate }: { selectedDate?: 
               Pré-visualização ajustada para papel 80mm Elgin i9 (37 colunas):
             </p>
 
-            {/* SE FOR EXTRATO DO CLIENTE: CONTROLE DE FILTRO DE COMANDAS PAGAS E PAGAMENTOS */}
+            {/* SE FOR EXTRATO DO CLIENTE: CONTROLE DE FILTRO DE PERÍODO, COMANDAS PAGAS E PAGAMENTOS */}
             {printModal.isCustomerLedger && (
               <div style={{ 
                 display: "flex", 
@@ -2093,12 +2353,92 @@ export default function CreditSalesDashboard({ selectedDate }: { selectedDate?: 
                 borderRadius: "8px",
                 border: "1px solid rgba(255, 255, 255, 0.05)"
               }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "6px" }}>
+                  <span style={{ fontSize: "11px", color: "var(--text-muted)", fontWeight: 600 }}>Filtrar Período:</span>
+                  <div style={{ display: "flex", gap: "6px", alignItems: "center", flexWrap: "wrap" }}>
+                    <div style={{ display: "flex", gap: "4px", background: "rgba(0,0,0,0.4)", padding: "2px 4px", borderRadius: "6px" }}>
+                      <button
+                        type="button"
+                        onClick={() => handlePrintCustomerLedger(printModal.includePaid, printModal.includePayments, 'all', printModal.selectedDate, printModal.selectedMonth)}
+                        style={{
+                          padding: "3px 8px",
+                          fontSize: "10px",
+                          borderRadius: "4px",
+                          border: "none",
+                          cursor: "pointer",
+                          background: printModal.periodType === 'all' ? "var(--primary)" : "transparent",
+                          color: printModal.periodType === 'all' ? "#000" : "var(--text-muted)",
+                          fontWeight: 800
+                        }}
+                      >
+                        Tudo
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handlePrintCustomerLedger(printModal.includePaid, printModal.includePayments, 'date', printModal.selectedDate, printModal.selectedMonth)}
+                        style={{
+                          padding: "3px 8px",
+                          fontSize: "10px",
+                          borderRadius: "4px",
+                          border: "none",
+                          cursor: "pointer",
+                          background: printModal.periodType === 'date' ? "var(--primary)" : "transparent",
+                          color: printModal.periodType === 'date' ? "#000" : "var(--text-muted)",
+                          fontWeight: 800
+                        }}
+                      >
+                        Por Data
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handlePrintCustomerLedger(printModal.includePaid, printModal.includePayments, 'month', printModal.selectedDate, printModal.selectedMonth)}
+                        style={{
+                          padding: "3px 8px",
+                          fontSize: "10px",
+                          borderRadius: "4px",
+                          border: "none",
+                          cursor: "pointer",
+                          background: printModal.periodType === 'month' ? "var(--primary)" : "transparent",
+                          color: printModal.periodType === 'month' ? "#000" : "var(--text-muted)",
+                          fontWeight: 800
+                        }}
+                      >
+                        Por Mês
+                      </button>
+                    </div>
+
+                    {printModal.periodType === 'date' && (
+                      <input 
+                        type="date"
+                        value={printModal.selectedDate || printSelectedDate}
+                        onChange={(e) => {
+                          setPrintSelectedDate(e.target.value);
+                          handlePrintCustomerLedger(printModal.includePaid, printModal.includePayments, 'date', e.target.value, printModal.selectedMonth);
+                        }}
+                        style={{ background: 'rgba(0,0,0,0.5)', border: '1px solid var(--primary)', color: '#fff', fontSize: '10px', padding: '2px 6px', borderRadius: '4px', cursor: 'pointer', outline: 'none' }}
+                      />
+                    )}
+
+                    {printModal.periodType === 'month' && (
+                      <input 
+                        type="month"
+                        value={printModal.selectedMonth || printSelectedMonth}
+                        onChange={(e) => {
+                          setPrintSelectedMonth(e.target.value);
+                          handlePrintCustomerLedger(printModal.includePaid, printModal.includePayments, 'month', printModal.selectedDate, e.target.value);
+                        }}
+                        style={{ background: 'rgba(0,0,0,0.5)', border: '1px solid var(--primary)', color: '#fff', fontSize: '10px', padding: '2px 6px', borderRadius: '4px', cursor: 'pointer', outline: 'none' }}
+                      />
+                    )}
+                  </div>
+                </div>
+
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                   <span style={{ fontSize: "11px", color: "var(--text-muted)", fontWeight: 600 }}>Imprimir comandas:</span>
                   <div style={{ display: "flex", gap: "6px" }}>
                     <button
                       type="button"
-                      onClick={() => handlePrintCustomerLedger(false, printModal.includePayments)}
+                      onClick={() => handlePrintCustomerLedger(false, printModal.includePayments, printModal.periodType, printModal.selectedDate, printModal.selectedMonth)}
                       style={{
                         padding: "4px 10px",
                         fontSize: "11px",
@@ -2115,7 +2455,7 @@ export default function CreditSalesDashboard({ selectedDate }: { selectedDate?: 
                     </button>
                     <button
                       type="button"
-                      onClick={() => handlePrintCustomerLedger(true, printModal.includePayments)}
+                      onClick={() => handlePrintCustomerLedger(true, printModal.includePayments, printModal.periodType, printModal.selectedDate, printModal.selectedMonth)}
                       style={{
                         padding: "4px 10px",
                         fontSize: "11px",
@@ -2138,7 +2478,7 @@ export default function CreditSalesDashboard({ selectedDate }: { selectedDate?: 
                   <div style={{ display: "flex", gap: "6px" }}>
                     <button
                       type="button"
-                      onClick={() => handlePrintCustomerLedger(printModal.includePaid, false)}
+                      onClick={() => handlePrintCustomerLedger(printModal.includePaid, false, printModal.periodType, printModal.selectedDate, printModal.selectedMonth)}
                       style={{
                         padding: "4px 10px",
                         fontSize: "11px",
@@ -2155,7 +2495,7 @@ export default function CreditSalesDashboard({ selectedDate }: { selectedDate?: 
                     </button>
                     <button
                       type="button"
-                      onClick={() => handlePrintCustomerLedger(printModal.includePaid, true)}
+                      onClick={() => handlePrintCustomerLedger(printModal.includePaid, true, printModal.periodType, printModal.selectedDate, printModal.selectedMonth)}
                       style={{
                         padding: "4px 10px",
                         fontSize: "11px",
