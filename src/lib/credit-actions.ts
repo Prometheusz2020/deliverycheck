@@ -182,7 +182,9 @@ export async function addCreditSale(
       return { success: false, error: "A venda deve conter pelo menos um item." };
     }
 
-    const saleDate = dateStr ? new Date(dateStr) : new Date();
+    const saleDate = dateStr 
+      ? (dateStr.includes("T") ? new Date(dateStr) : new Date(`${dateStr}T12:00:00`))
+      : new Date();
 
     // Calcula o total
     const totalAmount = items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
@@ -318,7 +320,9 @@ export async function addPayment(
       return { success: false, error: "O valor do pagamento deve ser maior que zero." };
     }
 
-    const paymentDate = dateStr ? new Date(dateStr) : new Date();
+    const paymentDate = dateStr 
+      ? (dateStr.includes("T") ? new Date(dateStr) : new Date(`${dateStr}T12:00:00`))
+      : new Date();
 
     const payment = await prisma.payment.create({
       data: {

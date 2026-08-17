@@ -165,19 +165,26 @@ export default function CreditSalesDashboard({ selectedDate }: { selectedDate?: 
     }
   };
 
-  // Filtros de Data para Lançamentos Fiado (Hoje / Ontem / Data Específica / Por Mês / Todos)
-  const [recentSalesFilter, setRecentSalesFilter] = useState<'hoje' | 'ontem' | 'custom' | 'mes' | 'todos'>('hoje');
+  // Filtros de Data para Lançamentos Fiado (Hoje / Ontem / Data Específica / Por Mês / Por Período / Todos)
+  const [recentSalesFilter, setRecentSalesFilter] = useState<'hoje' | 'ontem' | 'custom' | 'mes' | 'periodo' | 'todos'>('hoje');
   const [customDateFilter, setCustomDateFilter] = useState<string>(new Date().toLocaleDateString('sv-SE'));
   const [customMonthFilter, setCustomMonthFilter] = useState<string>(new Date().toISOString().substring(0, 7));
+  const [startDateFilter, setStartDateFilter] = useState<string>(new Date().toLocaleDateString('sv-SE'));
+  const [endDateFilter, setEndDateFilter] = useState<string>(new Date().toLocaleDateString('sv-SE'));
 
   // Opção de período para impressão do extrato do cliente
-  const [printPeriodType, setPrintPeriodType] = useState<'all' | 'date' | 'month'>('all');
+  const [printPeriodType, setPrintPeriodType] = useState<'all' | 'date' | 'month' | 'range'>('all');
   const [printSelectedDate, setPrintSelectedDate] = useState<string>(new Date().toLocaleDateString('sv-SE'));
   const [printSelectedMonth, setPrintSelectedMonth] = useState<string>(new Date().toISOString().substring(0, 7));
+  const [printStartDate, setPrintStartDate] = useState<string>(new Date().toLocaleDateString('sv-SE'));
+  const [printEndDate, setPrintEndDate] = useState<string>(new Date().toLocaleDateString('sv-SE'));
 
   // Auxiliares para filtro por data local
   const isSameDay = useCallback((dateInput: Date | string, targetDate: Date) => {
-    const d = new Date(dateInput);
+    let d = new Date(dateInput);
+    if (typeof dateInput === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateInput)) {
+      d = new Date(dateInput + 'T12:00:00');
+    }
     return (
       d.getFullYear() === targetDate.getFullYear() &&
       d.getMonth() === targetDate.getMonth() &&
@@ -214,8 +221,16 @@ export default function CreditSalesDashboard({ selectedDate }: { selectedDate?: 
         return d.getFullYear() === year && d.getMonth() === month;
       });
     }
+    if (recentSalesFilter === 'periodo' && startDateFilter && endDateFilter) {
+      const start = new Date(startDateFilter + 'T00:00:00');
+      const end = new Date(endDateFilter + 'T23:59:59');
+      return recentSales.filter(s => {
+        const d = new Date(s.date);
+        return d >= start && d <= end;
+      });
+    }
     return recentSales;
-  }, [recentSales, recentSalesFilter, customDateFilter, customMonthFilter, isSameDay, getYesterdayDate]);
+  }, [recentSales, recentSalesFilter, customDateFilter, customMonthFilter, startDateFilter, endDateFilter, isSameDay, getYesterdayDate]);
 
   const recentSalesSubtotal = useMemo(() => {
     return filteredRecentSales.reduce((acc, s) => acc + (s.totalAmount || 0), 0);
@@ -238,9 +253,11 @@ export default function CreditSalesDashboard({ selectedDate }: { selectedDate?: 
     isRecentSales?: boolean;
     includePaid?: boolean;
     includePayments?: boolean;
-    periodType?: 'all' | 'date' | 'month';
+    periodType?: 'all' | 'date' | 'month' | 'range';
     selectedDate?: string;
     selectedMonth?: string;
+    selectedStartDate?: string;
+    selectedEndDate?: string;
   } | null>(null);
 
   // Auxiliares para formatação de 37 colunas em impressora térmica (Elgin i9)
@@ -295,7 +312,7 @@ export default function CreditSalesDashboard({ selectedDate }: { selectedDate?: 
     });
   };
 
-  // 1b. Relatório de Lançamentos Fiado por Data ou por Mês
+  // 1b. Relatório de Lançamentos Fiado por Data ou por Mês ou Intervalo
   const handlePrintRecentSales = () => {
     const nowStr = new Date().toLocaleString('pt-BR');
     let periodLabel = "TODOS OS LANÇAMENTOS";
@@ -309,6 +326,10 @@ export default function CreditSalesDashboard({ selectedDate }: { selectedDate?: 
       const dateObj = new Date(parseInt(y), parseInt(m) - 1, 1);
       const monthName = dateObj.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
       periodLabel = `MÊS: ${monthName.toUpperCase()}`;
+    } else if (recentSalesFilter === 'periodo' && startDateFilter && endDateFilter) {
+      const [y1, m1, d1] = startDateFilter.split('-');
+      const [y2, m2, d2] = endDateFilter.split('-');
+      periodLabel = `PERIODO: ${d1}/${m1}/${y1} A ${d2}/${m2}/${y2}`;
     }
 
     const lines: string[] = [
@@ -347,13 +368,15 @@ export default function CreditSalesDashboard({ selectedDate }: { selectedDate?: 
     });
   };
 
-  // 2. Extrato Completo, Em Aberto ou Filtrado Por Data / Mês do Cliente Selecionado
+  // 2. Extrato Completo, Em Aberto ou Filtrado Por Data / Mês / Período do Cliente Selecionado
   const handlePrintCustomerLedger = (
     overrideIncludePaid?: boolean, 
     overrideIncludePayments?: boolean,
-    overridePeriodType?: 'all' | 'date' | 'month',
+    overridePeriodType?: 'all' | 'date' | 'month' | 'range',
     overrideDate?: string,
-    overrideMonth?: string
+    overrideMonth?: string,
+    overrideStartDate?: string,
+    overrideEndDate?: string
   ) => {
     if (!customerDetails) return;
     const showPaid = overrideIncludePaid !== undefined ? overrideIncludePaid : includePaidInPrint;
@@ -361,6 +384,8 @@ export default function CreditSalesDashboard({ selectedDate }: { selectedDate?: 
     const periodType = overridePeriodType !== undefined ? overridePeriodType : printPeriodType;
     const targetDateStr = overrideDate !== undefined ? overrideDate : printSelectedDate;
     const targetMonthStr = overrideMonth !== undefined ? overrideMonth : printSelectedMonth;
+    const targetStartStr = overrideStartDate !== undefined ? overrideStartDate : printStartDate;
+    const targetEndStr = overrideEndDate !== undefined ? overrideEndDate : printEndDate;
 
     const nowStr = new Date().toLocaleString('pt-BR');
 
@@ -387,6 +412,16 @@ export default function CreditSalesDashboard({ selectedDate }: { selectedDate?: 
         const d = new Date(s.date);
         return d.getFullYear() === year && d.getMonth() === month;
       });
+    } else if (periodType === 'range' && targetStartStr && targetEndStr) {
+      const [y1, m1, d1] = targetStartStr.split('-');
+      const [y2, m2, d2] = targetEndStr.split('-');
+      periodHeaderLabel = `EXTRATO FIADO (${d1}/${m1} A ${d2}/${m2})`;
+      const start = new Date(targetStartStr + 'T00:00:00');
+      const end = new Date(targetEndStr + 'T23:59:59');
+      baseSales = baseSales.filter(s => {
+        const d = new Date(s.date);
+        return d >= start && d <= end;
+      });
     }
 
     // Filtrar pagamentos por período também se showPayments for true
@@ -401,6 +436,13 @@ export default function CreditSalesDashboard({ selectedDate }: { selectedDate?: 
       basePayments = basePayments.filter(p => {
         const d = new Date(p.date);
         return d.getFullYear() === year && d.getMonth() === month;
+      });
+    } else if (periodType === 'range' && targetStartStr && targetEndStr) {
+      const start = new Date(targetStartStr + 'T00:00:00');
+      const end = new Date(targetEndStr + 'T23:59:59');
+      basePayments = basePayments.filter(p => {
+        const d = new Date(p.date);
+        return d >= start && d <= end;
       });
     }
 
@@ -473,7 +515,9 @@ export default function CreditSalesDashboard({ selectedDate }: { selectedDate?: 
       includePayments: showPayments,
       periodType,
       selectedDate: targetDateStr,
-      selectedMonth: targetMonthStr
+      selectedMonth: targetMonthStr,
+      selectedStartDate: targetStartStr,
+      selectedEndDate: targetEndStr
     });
   };
 
@@ -1129,6 +1173,22 @@ export default function CreditSalesDashboard({ selectedDate }: { selectedDate?: 
                       Por Mês
                     </button>
                     <button
+                      onClick={() => setRecentSalesFilter('periodo')}
+                      style={{
+                        padding: '0.3rem 0.8rem',
+                        fontSize: '11px',
+                        borderRadius: '6px',
+                        border: 'none',
+                        cursor: 'pointer',
+                        fontWeight: recentSalesFilter === 'periodo' ? 800 : 600,
+                        background: recentSalesFilter === 'periodo' ? 'var(--primary)' : 'transparent',
+                        color: recentSalesFilter === 'periodo' ? '#000' : 'var(--text-muted)',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      Por Período
+                    </button>
+                    <button
                       onClick={() => setRecentSalesFilter('todos')}
                       style={{
                         padding: '0.3rem 0.8rem',
@@ -1194,6 +1254,56 @@ export default function CreditSalesDashboard({ selectedDate }: { selectedDate?: 
                         onChange={(e) => {
                           setCustomMonthFilter(e.target.value);
                           setRecentSalesFilter('mes');
+                        }}
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          color: '#fff',
+                          fontSize: '11px',
+                          fontFamily: 'inherit',
+                          cursor: 'pointer',
+                          outline: 'none'
+                        }}
+                      />
+                    </div>
+                  )}
+
+                  {/* Seletor por Intervalo de Datas (Início e Fim) */}
+                  {recentSalesFilter === 'periodo' && (
+                    <div style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: '6px', 
+                      background: 'rgba(0, 242, 255, 0.15)', 
+                      padding: '2px 8px', 
+                      borderRadius: '8px', 
+                      border: '1px solid var(--primary)' 
+                    }}>
+                      <span style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: 700 }}>De:</span>
+                      <input 
+                        type="date"
+                        value={startDateFilter}
+                        onChange={(e) => {
+                          setStartDateFilter(e.target.value);
+                          setRecentSalesFilter('periodo');
+                        }}
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          color: '#fff',
+                          fontSize: '11px',
+                          fontFamily: 'inherit',
+                          cursor: 'pointer',
+                          outline: 'none'
+                        }}
+                      />
+                      <span style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: 700 }}>Até:</span>
+                      <input 
+                        type="date"
+                        value={endDateFilter}
+                        onChange={(e) => {
+                          setEndDateFilter(e.target.value);
+                          setRecentSalesFilter('periodo');
                         }}
                         style={{
                           background: 'transparent',
@@ -1567,6 +1677,24 @@ export default function CreditSalesDashboard({ selectedDate }: { selectedDate?: 
                             >
                               Por Mês
                             </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setPrintPeriodType('range');
+                              }}
+                              style={{
+                                padding: '2px 6px',
+                                fontSize: '10px',
+                                borderRadius: '4px',
+                                border: 'none',
+                                cursor: 'pointer',
+                                background: printPeriodType === 'range' ? 'var(--primary)' : 'transparent',
+                                color: printPeriodType === 'range' ? '#000' : 'var(--text-muted)',
+                                fontWeight: 800
+                              }}
+                            >
+                              Por Período
+                            </button>
                           </div>
 
                           {printPeriodType === 'date' && (
@@ -1585,6 +1713,25 @@ export default function CreditSalesDashboard({ selectedDate }: { selectedDate?: 
                               onChange={(e) => setPrintSelectedMonth(e.target.value)}
                               style={{ background: 'rgba(0,0,0,0.4)', border: '1px solid var(--primary)', color: '#fff', fontSize: '10px', padding: '2px 6px', borderRadius: '6px', cursor: 'pointer', outline: 'none' }}
                             />
+                          )}
+
+                          {printPeriodType === 'range' && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <span style={{ fontSize: '9px', color: 'var(--text-muted)' }}>De:</span>
+                              <input 
+                                type="date" 
+                                value={printStartDate}
+                                onChange={(e) => setPrintStartDate(e.target.value)}
+                                style={{ background: 'rgba(0,0,0,0.4)', border: '1px solid var(--primary)', color: '#fff', fontSize: '10px', padding: '2px 4px', borderRadius: '6px', cursor: 'pointer', outline: 'none' }}
+                              />
+                              <span style={{ fontSize: '9px', color: 'var(--text-muted)' }}>Até:</span>
+                              <input 
+                                type="date" 
+                                value={printEndDate}
+                                onChange={(e) => setPrintEndDate(e.target.value)}
+                                style={{ background: 'rgba(0,0,0,0.4)', border: '1px solid var(--primary)', color: '#fff', fontSize: '10px', padding: '2px 4px', borderRadius: '6px', cursor: 'pointer', outline: 'none' }}
+                              />
+                            </div>
                           )}
 
                           <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px', color: 'var(--text-muted)', cursor: 'pointer', userSelect: 'none' }}>
@@ -2391,7 +2538,7 @@ export default function CreditSalesDashboard({ selectedDate }: { selectedDate?: 
                       </button>
                       <button
                         type="button"
-                        onClick={() => handlePrintCustomerLedger(printModal.includePaid, printModal.includePayments, 'month', printModal.selectedDate, printModal.selectedMonth)}
+                        onClick={() => handlePrintCustomerLedger(printModal.includePaid, printModal.includePayments, 'month', printModal.selectedDate, printModal.selectedMonth, printModal.selectedStartDate, printModal.selectedEndDate)}
                         style={{
                           padding: "3px 8px",
                           fontSize: "10px",
@@ -2405,6 +2552,22 @@ export default function CreditSalesDashboard({ selectedDate }: { selectedDate?: 
                       >
                         Por Mês
                       </button>
+                      <button
+                        type="button"
+                        onClick={() => handlePrintCustomerLedger(printModal.includePaid, printModal.includePayments, 'range', printModal.selectedDate, printModal.selectedMonth, printModal.selectedStartDate, printModal.selectedEndDate)}
+                        style={{
+                          padding: "3px 8px",
+                          fontSize: "10px",
+                          borderRadius: "4px",
+                          border: "none",
+                          cursor: "pointer",
+                          background: printModal.periodType === 'range' ? "var(--primary)" : "transparent",
+                          color: printModal.periodType === 'range' ? "#000" : "var(--text-muted)",
+                          fontWeight: 800
+                        }}
+                      >
+                        Por Período
+                      </button>
                     </div>
 
                     {printModal.periodType === 'date' && (
@@ -2413,7 +2576,7 @@ export default function CreditSalesDashboard({ selectedDate }: { selectedDate?: 
                         value={printModal.selectedDate || printSelectedDate}
                         onChange={(e) => {
                           setPrintSelectedDate(e.target.value);
-                          handlePrintCustomerLedger(printModal.includePaid, printModal.includePayments, 'date', e.target.value, printModal.selectedMonth);
+                          handlePrintCustomerLedger(printModal.includePaid, printModal.includePayments, 'date', e.target.value, printModal.selectedMonth, printModal.selectedStartDate, printModal.selectedEndDate);
                         }}
                         style={{ background: 'rgba(0,0,0,0.5)', border: '1px solid var(--primary)', color: '#fff', fontSize: '10px', padding: '2px 6px', borderRadius: '4px', cursor: 'pointer', outline: 'none' }}
                       />
@@ -2425,10 +2588,35 @@ export default function CreditSalesDashboard({ selectedDate }: { selectedDate?: 
                         value={printModal.selectedMonth || printSelectedMonth}
                         onChange={(e) => {
                           setPrintSelectedMonth(e.target.value);
-                          handlePrintCustomerLedger(printModal.includePaid, printModal.includePayments, 'month', printModal.selectedDate, e.target.value);
+                          handlePrintCustomerLedger(printModal.includePaid, printModal.includePayments, 'month', printModal.selectedDate, e.target.value, printModal.selectedStartDate, printModal.selectedEndDate);
                         }}
                         style={{ background: 'rgba(0,0,0,0.5)', border: '1px solid var(--primary)', color: '#fff', fontSize: '10px', padding: '2px 6px', borderRadius: '4px', cursor: 'pointer', outline: 'none' }}
                       />
+                    )}
+
+                    {printModal.periodType === 'range' && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <span style={{ fontSize: '9px', color: 'var(--text-muted)' }}>De:</span>
+                        <input 
+                          type="date"
+                          value={printModal.selectedStartDate || printStartDate}
+                          onChange={(e) => {
+                            setPrintStartDate(e.target.value);
+                            handlePrintCustomerLedger(printModal.includePaid, printModal.includePayments, 'range', printModal.selectedDate, printModal.selectedMonth, e.target.value, printModal.selectedEndDate || printEndDate);
+                          }}
+                          style={{ background: 'rgba(0,0,0,0.5)', border: '1px solid var(--primary)', color: '#fff', fontSize: '10px', padding: '2px 4px', borderRadius: '4px', cursor: 'pointer', outline: 'none' }}
+                        />
+                        <span style={{ fontSize: '9px', color: 'var(--text-muted)' }}>Até:</span>
+                        <input 
+                          type="date"
+                          value={printModal.selectedEndDate || printEndDate}
+                          onChange={(e) => {
+                            setPrintEndDate(e.target.value);
+                            handlePrintCustomerLedger(printModal.includePaid, printModal.includePayments, 'range', printModal.selectedDate, printModal.selectedMonth, printModal.selectedStartDate || printStartDate, e.target.value);
+                          }}
+                          style={{ background: 'rgba(0,0,0,0.5)', border: '1px solid var(--primary)', color: '#fff', fontSize: '10px', padding: '2px 4px', borderRadius: '4px', cursor: 'pointer', outline: 'none' }}
+                        />
+                      </div>
                     )}
                   </div>
                 </div>
