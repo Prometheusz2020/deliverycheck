@@ -13,6 +13,7 @@ import {
   deleteProduct, 
   lookupBarcodeOnline,
   logoutGPlusUser,
+  markProductsAsExported,
   GPlusProductInput 
 } from "@/lib/gplus-actions";
 
@@ -24,6 +25,7 @@ interface Product {
   grupo: string | null;
   valor: number;
   codigoDeBarras: string | null;
+  exportado: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -42,6 +44,7 @@ export default function GPlusManager({ session }: GPlusManagerProps) {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [showExportModal, setShowExportModal] = useState(false);
   const itemsPerPage = 15;
 
   // Form states
@@ -478,15 +481,19 @@ export default function GPlusManager({ session }: GPlusManagerProps) {
     setFormCodigo("");
   };
 
-  // Export list of products to Excel/CSV
-  const exportProductsToCSV = () => {
-    if (products.length === 0) {
-      showNotification("error", "Não há produtos cadastrados para exportar.");
+  // Executa o download da lista para Excel/CSV e atualiza o status de exportado
+  const executeExport = async (includeExported: boolean) => {
+    setShowExportModal(false);
+
+    const targetProducts = includeExported ? products : products.filter(p => !p.exportado);
+
+    if (targetProducts.length === 0) {
+      showNotification("error", "Não há produtos pendentes para exportar.");
       return;
     }
 
     const headers = "Nome;Grupo;Valor;Código de Barras\r\n";
-    const rows = products.map(p => {
+    const rows = targetProducts.map(p => {
       const nome = `"${(p.nome || '').replace(/"/g, '""')}"`;
       const grupo = `"${(p.grupo || '').replace(/"/g, '""')}"`;
       const valor = p.valor !== undefined && p.valor !== null ? p.valor.toFixed(2).replace('.', ',') : "0,00";
@@ -501,7 +508,28 @@ export default function GPlusManager({ session }: GPlusManagerProps) {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    showNotification("success", "Lista de produtos exportada com sucesso!");
+
+    // Atualiza status de exportado no banco de dados e na memória local
+    const exportedIds = targetProducts.map(p => p.id);
+    await markProductsAsExported(exportedIds);
+
+    setProducts(prev => prev.map(p => exportedIds.includes(p.id) ? { ...p, exportado: true } : p));
+    showNotification("success", `${targetProducts.length} produto(s) exportado(s) com sucesso!`);
+  };
+
+  // Botão Exportar Excel - verifica se há itens já exportados
+  const handleExportClick = () => {
+    if (products.length === 0) {
+      showNotification("error", "Não há produtos cadastrados para exportar.");
+      return;
+    }
+
+    const hasExported = products.some(p => p.exportado);
+    if (hasExported) {
+      setShowExportModal(true);
+    } else {
+      executeExport(true);
+    }
   };
 
   // Web Audio synthetic beep
@@ -1158,7 +1186,7 @@ export default function GPlusManager({ session }: GPlusManagerProps) {
               />
             </div>
             <button 
-              onClick={exportProductsToCSV} 
+              onClick={handleExportClick} 
               className="btn-outline" 
               style={{ padding: "0.6rem 1rem", fontSize: "12px", display: "flex", alignItems: "center", gap: "6px" }}
               title="Baixar lista de produtos para Excel (CSV)"
@@ -1197,6 +1225,7 @@ export default function GPlusManager({ session }: GPlusManagerProps) {
                   <th>Grupo</th>
                   <th>Valor</th>
                   <th>Código de Barras</th>
+                  <th style={{ textAlign: "center" }}>Exportado</th>
                   <th style={{ width: "120px", textAlign: "center" }}>Ações</th>
                 </tr>
               </thead>
@@ -1231,6 +1260,38 @@ export default function GPlusManager({ session }: GPlusManagerProps) {
                         </span>
                       ) : (
                         <span style={{ color: "var(--text-muted)", fontSize: "12px" }}>--</span>
+                      )}
+                    </td>
+                    <td style={{ textAlign: "center" }}>
+                      {product.exportado ? (
+                        <span style={{ 
+                          fontSize: "11px", 
+                          fontWeight: 700, 
+                          padding: "0.2rem 0.6rem", 
+                          borderRadius: "12px", 
+                          background: "rgba(0, 255, 136, 0.12)", 
+                          color: "var(--success)", 
+                          border: "1px solid rgba(0, 255, 136, 0.3)",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "4px"
+                        }}>
+                          <CheckCircle2 size={12} /> Sim
+                        </span>
+                      ) : (
+                        <span style={{ 
+                          fontSize: "11px", 
+                          fontWeight: 600, 
+                          padding: "0.2rem 0.6rem", 
+                          borderRadius: "12px", 
+                          background: "rgba(255, 255, 255, 0.05)", 
+                          color: "var(--text-muted)", 
+                          border: "1px solid rgba(255, 255, 255, 0.1)",
+                          display: "inline-flex",
+                          alignItems: "center"
+                        }}>
+                          Não
+                        </span>
                       )}
                     </td>
                     <td style={{ textAlign: "center" }}>
@@ -1305,7 +1366,54 @@ export default function GPlusManager({ session }: GPlusManagerProps) {
 
       </div>
 
-
+      {/* Modal de Confirmação de Exportação */}
+      {showExportModal && (
+        <div style={{
+          position: "fixed",
+          inset: 0,
+          zIndex: 99999,
+          background: "rgba(0, 0, 0, 0.8)",
+          backdropFilter: "blur(8px)",
+          WebkitBackdropFilter: "blur(8px)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "1rem"
+        }}>
+          <div className="card-premium" style={{ width: "100%", maxWidth: "460px", padding: "2rem", textAlign: "center", position: "relative" }}>
+            <div style={{ padding: "1rem", background: "rgba(0, 242, 255, 0.1)", borderRadius: "50%", display: "inline-flex", marginBottom: "1rem", border: "1px solid rgba(0, 242, 255, 0.2)" }}>
+              <Download size={32} style={{ color: "var(--primary)" }} />
+            </div>
+            <h3 style={{ fontSize: "1.3rem", marginBottom: "0.8rem", color: "#fff" }}>OPÇÕES DE EXPORTAÇÃO</h3>
+            <p style={{ fontSize: "13px", color: "var(--text-secondary)", marginBottom: "1.5rem", lineHeight: "1.5" }}>
+              Existem produtos que já foram exportados anteriormente. Deseja incluir na exportação inclusive os que já foram exportados?
+            </p>
+            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+              <button
+                onClick={() => executeExport(false)}
+                className="btn-main"
+                style={{ width: "100%", padding: "0.8rem", fontSize: "13px" }}
+              >
+                Apenas Não Exportados ({products.filter(p => !p.exportado).length})
+              </button>
+              <button
+                onClick={() => executeExport(true)}
+                className="btn-outline"
+                style={{ width: "100%", padding: "0.8rem", fontSize: "13px", color: "var(--primary)", borderColor: "rgba(0,242,255,0.3)" }}
+              >
+                Incluir Todos ({products.length})
+              </button>
+              <button
+                onClick={() => setShowExportModal(false)}
+                className="btn-outline"
+                style={{ width: "100%", padding: "0.6rem", fontSize: "12px", marginTop: "4px" }}
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Hidden container for temp file scanner */}
       <div id="temp-file-scanner" style={{ display: "none" }}></div>

@@ -295,3 +295,22 @@ export async function lookupBarcodeOnline(barcode: string) {
     return { success: false, error: "Erro na consulta online de código de barras." };
   }
 }
+
+export async function markProductsAsExported(productIds: string[]) {
+  try {
+    if (!Array.isArray(productIds) || productIds.length === 0) {
+      return { success: true };
+    }
+
+    await prisma.produtoGPlus.updateMany({
+      where: { id: { in: productIds } },
+      data: { exportado: true },
+    });
+
+    revalidatePath("/produtos-gplus");
+    return { success: true };
+  } catch (error) {
+    console.error("Error marking products as exported:", error);
+    return { success: false, error: "Erro ao atualizar status de exportação dos produtos." };
+  }
+}

@@ -118,6 +118,7 @@ model ProdutoGPlus {
   grupo          String?
   valor          Float
   codigoDeBarras String?     @map("codigo_de_barras")
+  exportado      Boolean     @default(false)
   createdAt      DateTime    @default(now()) @map("created_at")
   updatedAt      DateTime    @updatedAt @map("updated_at")
 
