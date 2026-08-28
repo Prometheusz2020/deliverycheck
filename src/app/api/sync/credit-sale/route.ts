@@ -28,39 +28,51 @@ export async function POST(req: Request) {
       });
     }
 
-    // Se o pedido foi cancelado no GPlus, removemos do fiado se já existir na nuvem
-    if (creditSale.status === "CANCELADO") {
+    // Se a comanda deixou de ser fiado no GPlus (mudou para dinheiro/cartão) ou foi cancelada/removida:
+    if (creditSale.isFiado === false || creditSale.status === "CANCELADO" || creditSale.status === "REMOVIDO") {
       const existing = await prisma.creditSale.findUnique({
-        where: { gplusId },
+        where: { gplusId: String(gplusId).trim() },
       });
 
       if (existing) {
-        await prisma.creditSale.delete({
-          where: { id: existing.id },
-        });
-        return NextResponse.json({ success: true, message: `Venda cancelada comanda #${orderNumber} removida do fiado` });
+        if (existing.status === "PENDENTE") {
+          await prisma.creditSale.delete({
+            where: { id: existing.id },
+          });
+          return NextResponse.json({ success: true, message: `Venda comanda #${orderNumber} (GPlus ID: ${gplusId}) não é mais Fiado e foi removida.` });
+        }
+        return NextResponse.json({ success: true, message: `Venda comanda #${orderNumber} não é mais Fiado, mas já consta como PAGA na nuvem.` });
       }
 
-      return NextResponse.json({ success: true, message: `Venda cancelada comanda #${orderNumber} ignorada pois não constava no fiado` });
+      return NextResponse.json({ success: true, message: `Venda comanda #${orderNumber} ignorada pois não constava no fiado.` });
     }
 
     // Verifica se a venda a prazo já foi importada anteriormente
     const existing = await prisma.creditSale.findUnique({
-      where: { gplusId },
+      where: { gplusId: String(gplusId).trim() },
       include: { items: true }
     });
 
     if (existing) {
-      // Se a venda existe, mas o payload enviado tem itens detalhados E a venda existente só tem o item genérico, atualiza os itens
-      if (items && items.length > 0) {
-        const hasOnlyGeneric = existing.items.length === 1 && existing.items[0].description.startsWith('Consumo Comanda #');
-        if (hasOnlyGeneric) {
-          await prisma.$transaction(async (tx) => {
-            // Remove o item genérico antigo
-            await tx.creditSaleItem.deleteMany({
-              where: { saleId: existing.id }
-            });
-            // Cria os novos itens detalhados
+      if (existing.status === "PENDENTE") {
+        // Atualiza valor total, notas e recria a lista de itens da comanda fiado
+        const updatedSale = await prisma.$transaction(async (tx) => {
+          const updated = await tx.creditSale.update({
+            where: { id: existing.id },
+            data: {
+              totalAmount: totalAmount,
+              notes: notes || existing.notes,
+              date: date ? new Date(date) : existing.date,
+            },
+          });
+
+          // Remove os itens antigos
+          await tx.creditSaleItem.deleteMany({
+            where: { saleId: existing.id }
+          });
+
+          // Recria os itens novos (detalhados ou genérico)
+          if (items && items.length > 0) {
             const itemsData = items.map((item: any) => ({
               saleId: existing.id,
               description: String(item.description || 'Consumo').trim(),
@@ -71,12 +83,26 @@ export async function POST(req: Request) {
             await tx.creditSaleItem.createMany({
               data: itemsData,
             });
-          });
-          console.log(`[Sync API] Comanda #${orderNumber} atualizada com os itens detalhados consumidos`);
-          return NextResponse.json({ success: true, message: `Comanda #${orderNumber} atualizada com itens detalhados`, sale: existing });
-        }
+          } else {
+            await tx.creditSaleItem.create({
+              data: {
+                saleId: existing.id,
+                description: `Consumo Comanda #${orderNumber}`,
+                quantity: 1,
+                unitPrice: totalAmount,
+                totalPrice: totalAmount,
+              },
+            });
+          }
+
+          return updated;
+        });
+
+        console.log(`[Sync API] Comanda #${orderNumber} fiado atualizada (Valor: R$ ${totalAmount})`);
+        return NextResponse.json({ success: true, message: `Comanda #${orderNumber} fiado atualizada com novos valores/itens`, sale: updatedSale });
       }
-      return NextResponse.json({ success: true, message: `Comanda #${orderNumber} já integrada anteriormente`, sale: existing });
+
+      return NextResponse.json({ success: true, message: `Comanda #${orderNumber} já finalizada/paga anteriormente`, sale: existing });
     }
 
     // Limpa caracteres '#F' ou '#f' (e espaços extras) do nome do cliente enviado pelo GPlus

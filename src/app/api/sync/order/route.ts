@@ -92,6 +92,7 @@ export async function POST(req: Request) {
             customerName: order.customerName,
             address: order.address,
             totalAmount: order.totalAmount,
+            paymentMethod: order.paymentMethod || existing.paymentMethod,
             status: order.status === "CANCELADO" ? "CANCELADO" : existing.status,
             itemsCount: order.itemsCount !== undefined ? Number(order.itemsCount) : existing.itemsCount,
           }
@@ -108,6 +109,7 @@ export async function POST(req: Request) {
         customerName: order.customerName || "Consumidor",
         address: order.address || "Endereço não informado",
         totalAmount: order.totalAmount || 0,
+        paymentMethod: order.paymentMethod || null,
         deliveryFee: 0,
         status: order.status || "PENDENTE",
         observations: "Importado do GPlus",
