@@ -1,6 +1,7 @@
 @echo off
 setlocal enabledelayedexpansion
 cd /d "%~dp0"
+set NODE_OPTIONS=--max-old-space-size=4096
 title DeliveryCheck - Relatorio Estatistico de Entregas
 cls
 
