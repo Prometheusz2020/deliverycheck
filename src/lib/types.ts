@@ -32,3 +32,48 @@ export type DeliverySummary = {
   totalValue: number;
   totalFees: number;
 };
+
+export interface DriverStatItem {
+  driverId: string;
+  driverName: string;
+  isActive: boolean;
+  totalDeliveries: number;
+  deliveredCount: number;
+  totalAmount: number;
+  totalFees: number;
+  itemsCount: number;
+  sharePercentage: number;
+}
+
+export interface PaymentStatItem {
+  method: string;
+  count: number;
+  totalAmount: number;
+}
+
+export interface TimeSeriesStatItem {
+  label: string;
+  count: number;
+  deliveredCount: number;
+  totalAmount: number;
+}
+
+export interface DeliveryStatsReport {
+  period: "day" | "month";
+  dateStr: string;
+  title: string;
+  totalOrders: number;
+  deliveredOrders: number;
+  onRouteOrders: number;
+  pendingOrders: number;
+  canceledOrders: number;
+  totalAmount: number;
+  totalFees: number;
+  avgTicket: number;
+  totalItems: number;
+  completionRate: number;
+  drivers: DriverStatItem[];
+  paymentMethods: PaymentStatItem[];
+  timeline: TimeSeriesStatItem[];
+}
+

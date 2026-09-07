@@ -9,6 +9,8 @@ import {
   Briefcase, LogOut, Package, User, Trash2, RotateCcw
 } from "lucide-react";
 import CreditSalesDashboard from "./CreditSalesDashboard";
+import DeliveryStatsDashboard from "./DeliveryStatsDashboard";
+
 
 export default function RestaurantPortal() {
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
@@ -17,7 +19,7 @@ export default function RestaurantPortal() {
   const [summary, setSummary] = useState<DeliverySummary>({ 
     pending: 0, onRoute: 0, delivered: 0, totalValue: 0, totalFees: 0 
   });
-  const [activeTab, setActiveTab] = useState<'deliveries' | 'drivers' | 'creditsales' | 'deleted'>('deliveries');
+  const [activeTab, setActiveTab] = useState<'deliveries' | 'drivers' | 'creditsales' | 'deleted' | 'stats'>('deliveries');
   const [deletedSearchTerm, setDeletedSearchTerm] = useState("");
   
   const [newDriverName, setNewDriverName] = useState("");
@@ -167,6 +169,9 @@ export default function RestaurantPortal() {
             <button onClick={() => setActiveTab('deliveries')} className={activeTab === 'deliveries' ? 'btn-main' : 'btn-outline'} style={{ padding: '0.6rem 1.5rem', fontSize: '12px', borderRadius: '8px' }}>
               <ClipboardList size={16} /> Entregas
             </button>
+            <button onClick={() => setActiveTab('stats')} className={activeTab === 'stats' ? 'btn-main' : 'btn-outline'} style={{ padding: '0.6rem 1.5rem', fontSize: '12px', borderRadius: '8px', marginLeft: '0.4rem' }}>
+              <BarChart2 size={16} /> Estatísticas
+            </button>
             <button onClick={() => setActiveTab('drivers')} className={activeTab === 'drivers' ? 'btn-main' : 'btn-outline'} style={{ padding: '0.6rem 1.5rem', fontSize: '12px', borderRadius: '8px', marginLeft: '0.4rem' }}>
               <Users size={16} /> Motoristas
             </button>
@@ -177,6 +182,7 @@ export default function RestaurantPortal() {
               <Trash2 size={16} style={{ color: activeTab === 'deleted' ? 'inherit' : 'var(--danger)' }} /> Deletadas ({deletedDeliveries.length})
             </button>
           </div>
+
           <div style={{ display: 'flex', alignItems: 'center', background: 'var(--surface-high)', padding: '0.4rem 0.8rem', borderRadius: '12px', gap: '8px' }}>
             <Clock size={16} style={{ color: 'var(--accent)' }} />
             <input 
@@ -193,7 +199,7 @@ export default function RestaurantPortal() {
         </div>
       </header>
 
-      {activeTab !== 'creditsales' && activeTab !== 'deleted' && (
+      {activeTab !== 'creditsales' && activeTab !== 'deleted' && activeTab !== 'stats' && (
         <div className="grid-quarters" style={{ gridTemplateColumns: 'repeat(2, 1fr)' }}>
           {[
             { label: 'Pendentes', val: summary.pending, icon: Clock, color: 'var(--warning)' },
@@ -832,7 +838,7 @@ export default function RestaurantPortal() {
         </div>
       ) : activeTab === 'creditsales' ? (
         <CreditSalesDashboard selectedDate={selectedDate} />
-      ) : (
+      ) : activeTab === 'deleted' ? (
         /* Relatório de Comandas Deletadas */
         <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
           {/* Cards de Métricas do Relatório */}
@@ -984,7 +990,10 @@ export default function RestaurantPortal() {
             );
           })()}
         </div>
-      )}
+      ) : activeTab === 'stats' ? (
+        <DeliveryStatsDashboard />
+      ) : null}
     </div>
   );
 }
+

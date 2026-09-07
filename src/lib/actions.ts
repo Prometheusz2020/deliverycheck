@@ -2,7 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "./db";
-import { Delivery, DeliveryStatus } from "./types";
+import { Delivery, DeliveryStatus, DeliveryStatsReport } from "./types";
+
 import { cookies } from "next/headers";
 
 export async function addDriver(name: string, password?: string) {
@@ -463,3 +464,238 @@ export async function toggleDriverActive(id: string, active: boolean) {
   revalidatePath("/driver");
   return driver;
 }
+
+export async function getDeliveryStatsReport(params: {
+  period: "day" | "month";
+  dateStr?: string; // YYYY-MM-DD for day, YYYY-MM for month
+}): Promise<DeliveryStatsReport> {
+  const period = params.period || "day";
+  const now = new Date();
+
+  let start: Date;
+  let end: Date;
+  let titleStr = "";
+
+  if (period === "day") {
+    let year = now.getFullYear();
+    let month = now.getMonth();
+    let day = now.getDate();
+
+    if (params.dateStr) {
+      const parts = params.dateStr.split("-").map(Number);
+      if (parts.length === 3 && !parts.some(isNaN)) {
+        year = parts[0];
+        month = parts[1] - 1;
+        day = parts[2];
+      }
+    }
+    start = new Date(year, month, day, 0, 0, 0, 0);
+    end = new Date(year, month, day, 23, 59, 59, 999);
+    titleStr = `Relatório Diário - ${String(day).padStart(2, '0')}/${String(month + 1).padStart(2, '0')}/${year}`;
+  } else {
+    let year = now.getFullYear();
+    let month = now.getMonth();
+
+    if (params.dateStr) {
+      const parts = params.dateStr.split("-").map(Number);
+      if (parts.length >= 2 && !parts.some(isNaN)) {
+        year = parts[0];
+        month = parts[1] - 1;
+      }
+    }
+    start = new Date(year, month, 1, 0, 0, 0, 0);
+    const lastDayOfMonth = new Date(year, month + 1, 0).getDate();
+    end = new Date(year, month, lastDayOfMonth, 23, 59, 59, 999);
+    
+    const monthNames = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+    titleStr = `Relatório Mensal - ${monthNames[month]} de ${year}`;
+  }
+
+  const [deliveries, drivers] = await Promise.all([
+    prisma.delivery.findMany({
+      where: {
+        scannedAt: { gte: start, lte: end }
+      },
+      include: { driver: true }
+    }),
+    prisma.driver.findMany({ orderBy: { name: 'asc' } })
+  ]);
+
+  const totalOrders = deliveries.length;
+  let deliveredOrders = 0;
+  let onRouteOrders = 0;
+  let pendingOrders = 0;
+  let canceledOrders = 0;
+  let totalAmount = 0;
+  let totalFees = 0;
+  let totalItems = 0;
+
+  const paymentMap: Record<string, { count: number; totalAmount: number }> = {};
+  const driverMap: Record<string, {
+    driverId: string;
+    driverName: string;
+    isActive: boolean;
+    totalDeliveries: number;
+    deliveredCount: number;
+    totalAmount: number;
+    totalFees: number;
+    itemsCount: number;
+  }> = {};
+
+  // Inicializa mapa de motoristas com todos cadastrados
+  for (const dr of drivers) {
+    driverMap[dr.id] = {
+      driverId: dr.id,
+      driverName: dr.name,
+      isActive: dr.isActive,
+      totalDeliveries: 0,
+      deliveredCount: 0,
+      totalAmount: 0,
+      totalFees: 0,
+      itemsCount: 0
+    };
+  }
+
+  const timelineMap: Record<string, { count: number; deliveredCount: number; totalAmount: number }> = {};
+
+  deliveries.forEach((d) => {
+    const amt = d.totalAmount || 0;
+    const fee = d.deliveryFee || 0;
+    const items = d.itemsCount || 1;
+
+    if (d.status === "ENTREGUE") {
+      deliveredOrders++;
+      totalAmount += amt;
+      totalFees += fee;
+      totalItems += items;
+    } else if (d.status === "EM ROTA") {
+      onRouteOrders++;
+      totalAmount += amt;
+      totalFees += fee;
+    } else if (d.status === "PENDENTE") {
+      pendingOrders++;
+    } else if (d.status === "CANCELADO") {
+      canceledOrders++;
+    }
+
+    // Métricas por Motoboy
+    let targetDriverId = d.driverId;
+    if (!targetDriverId && d.deliveryPerson) {
+      const matched = drivers.find(dr => dr.name.toLowerCase() === d.deliveryPerson?.toLowerCase());
+      if (matched) targetDriverId = matched.id;
+    }
+
+    if (targetDriverId && driverMap[targetDriverId]) {
+      const drObj = driverMap[targetDriverId];
+      drObj.totalDeliveries++;
+      if (d.status === "ENTREGUE") {
+        drObj.deliveredCount++;
+        drObj.totalAmount += amt;
+        drObj.totalFees += fee;
+        drObj.itemsCount += items;
+      }
+    } else if (d.deliveryPerson) {
+      // Caso motoboy não esteja no banco
+      const key = `unknown_${d.deliveryPerson}`;
+      if (!driverMap[key]) {
+        driverMap[key] = {
+          driverId: key,
+          driverName: d.deliveryPerson,
+          isActive: false,
+          totalDeliveries: 0,
+          deliveredCount: 0,
+          totalAmount: 0,
+          totalFees: 0,
+          itemsCount: 0
+        };
+      }
+      driverMap[key].totalDeliveries++;
+      if (d.status === "ENTREGUE") {
+        driverMap[key].deliveredCount++;
+        driverMap[key].totalAmount += amt;
+        driverMap[key].totalFees += fee;
+        driverMap[key].itemsCount += items;
+      }
+    }
+
+    // Formas de Pagamento
+    const pMethod = d.paymentMethod?.trim() || "Não informado";
+    if (!paymentMap[pMethod]) {
+      paymentMap[pMethod] = { count: 0, totalAmount: 0 };
+    }
+    paymentMap[pMethod].count++;
+    if (d.status === "ENTREGUE") {
+      paymentMap[pMethod].totalAmount += amt;
+    }
+
+    // Timeline (Hora no Dia ou Dia no Mês)
+    const scanDate = new Date(d.scannedAt);
+    let labelKey = "";
+    if (period === "day") {
+      const hour = scanDate.getHours();
+      labelKey = `${String(hour).padStart(2, '0')}:00`;
+    } else {
+      const dayNum = scanDate.getDate();
+      const monthNum = scanDate.getMonth() + 1;
+      labelKey = `${String(dayNum).padStart(2, '0')}/${String(monthNum).padStart(2, '0')}`;
+    }
+
+    if (!timelineMap[labelKey]) {
+      timelineMap[labelKey] = { count: 0, deliveredCount: 0, totalAmount: 0 };
+    }
+    timelineMap[labelKey].count++;
+    if (d.status === "ENTREGUE") {
+      timelineMap[labelKey].deliveredCount++;
+      timelineMap[labelKey].totalAmount += amt;
+    }
+  });
+
+  const validDeliveredForCalc = deliveredOrders > 0 ? deliveredOrders : 1;
+  const driverStats = Object.values(driverMap)
+    .filter(dr => dr.totalDeliveries > 0 || dr.isActive)
+    .map(dr => ({
+      ...dr,
+      sharePercentage: parseFloat(((dr.deliveredCount / validDeliveredForCalc) * 100).toFixed(1))
+    }))
+    .sort((a, b) => b.deliveredCount - a.deliveredCount);
+
+  const paymentStats = Object.entries(paymentMap).map(([method, data]) => ({
+    method,
+    count: data.count,
+    totalAmount: data.totalAmount
+  })).sort((a, b) => b.count - a.count);
+
+  const timelineStats = Object.entries(timelineMap).map(([label, data]) => ({
+    label,
+    count: data.count,
+    deliveredCount: data.deliveredCount,
+    totalAmount: data.totalAmount
+  })).sort((a, b) => a.label.localeCompare(b.label));
+
+  const avgTicket = deliveredOrders > 0 ? totalAmount / deliveredOrders : 0;
+  const completionRate = totalOrders > 0 ? (deliveredOrders / totalOrders) * 100 : 0;
+
+  const dateStrFormatted = period === "day" 
+    ? `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}-${String(start.getDate()).padStart(2, '0')}`
+    : `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}`;
+
+  return {
+    period,
+    dateStr: dateStrFormatted,
+    title: titleStr,
+    totalOrders,
+    deliveredOrders,
+    onRouteOrders,
+    pendingOrders,
+    canceledOrders,
+    totalAmount,
+    totalFees,
+    avgTicket,
+    totalItems,
+    completionRate,
+    drivers: driverStats,
+    paymentMethods: paymentStats,
+    timeline: timelineStats
+  };
+}
+
