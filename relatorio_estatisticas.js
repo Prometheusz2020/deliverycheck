@@ -8,9 +8,45 @@
  *   node relatorio_estatisticas.js --anos 10          (Relatório acumulado dos últimos 10 anos)
  */
 
+const { execSync } = require('child_process');
 require('dotenv').config();
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+
+let PrismaClient;
+try {
+    PrismaClient = require('@prisma/client').PrismaClient;
+} catch (e) {
+    console.log('[!] Gerando cliente do banco de dados (Prisma)...');
+    try {
+        execSync('npx prisma generate', { stdio: 'inherit' });
+        PrismaClient = require('@prisma/client').PrismaClient;
+    } catch (genErr) {
+        console.error('[-] Falha ao gerar o Prisma Client:', genErr.message);
+        process.exit(1);
+    }
+}
+
+let prisma;
+function getPrisma() {
+    if (!prisma) {
+        try {
+            prisma = new PrismaClient();
+        } catch (err) {
+            if (err.message && err.message.includes('did not initialize yet')) {
+                console.log('[!] Inicializando Prisma Client...');
+                try {
+                    execSync('npx prisma generate', { stdio: 'inherit' });
+                    prisma = new PrismaClient();
+                } catch (genErr) {
+                    console.error('[-] Falha ao executar prisma generate:', genErr.message);
+                    throw err;
+                }
+            } else {
+                throw err;
+            }
+        }
+    }
+    return prisma;
+}
 
 const formatMoney = (val) => {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0);
@@ -43,6 +79,7 @@ const parseArgs = () => {
 };
 
 async function generateReport(period, dateStr) {
+    const db = getPrisma();
     const now = new Date();
     let start, end, title;
 
@@ -91,10 +128,10 @@ async function generateReport(period, dateStr) {
     console.time('Tempo de processamento do banco');
 
     const [deliveries, drivers] = await Promise.all([
-        prisma.delivery.findMany({
+        db.delivery.findMany({
             where: { scannedAt: { gte: start, lte: end } }
         }),
-        prisma.driver.findMany()
+        db.driver.findMany()
     ]);
 
     console.timeEnd('Tempo de processamento do banco');
@@ -261,7 +298,9 @@ async function main() {
     } catch (err) {
         console.error('Erro ao gerar relatório estatístico:', err.message);
     } finally {
-        await prisma.$disconnect();
+        if (prisma) {
+            await prisma.$disconnect();
+        }
     }
 }
 
