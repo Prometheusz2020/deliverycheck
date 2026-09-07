@@ -55,31 +55,39 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: true, message: "Ignorado por ser consumo local/balcão (sem endereço)" });
     }
 
-    // Valida se a data do pedido é de hoje (evita que comandas retroativas criem entregas hoje)
+    // Processamento de datas (seja de hoje ou histórico)
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
+    let orderDate = new Date();
+    let isHistorical = false;
+
     if (order.date) {
-      let orderDate: Date;
       if (typeof order.date === "string") {
         const datePart = order.date.split("T")[0];
         const [year, month, day] = datePart.split("-").map(Number);
-        orderDate = new Date(year, month - 1, day, 0, 0, 0, 0);
+        orderDate = new Date(year, month - 1, day, 12, 0, 0, 0);
       } else {
         orderDate = new Date(order.date);
-        orderDate.setHours(0, 0, 0, 0);
       }
-
-      if (orderDate < today) {
-        return NextResponse.json({ success: true, message: "Ignorado por não ser uma entrega de hoje" });
+      
+      const orderDateMidnight = new Date(orderDate);
+      orderDateMidnight.setHours(0, 0, 0, 0);
+      if (orderDateMidnight < today) {
+        isHistorical = true;
       }
     }
 
-    // Busca pedido de hoje com o mesmo número para evitar duplicidade ou atualizar dados
+    const orderDayStart = new Date(orderDate);
+    orderDayStart.setHours(0, 0, 0, 0);
+    const orderDayEnd = new Date(orderDate);
+    orderDayEnd.setHours(23, 59, 59, 999);
+
+    // Busca pedido dessa mesma data com o mesmo número para evitar duplicidade
     const existing = await prisma.delivery.findFirst({
       where: {
         orderNumber: order.orderNumber,
-        scannedAt: { gte: today }
+        scannedAt: { gte: orderDayStart, lte: orderDayEnd }
       },
     });
 
@@ -93,7 +101,7 @@ export async function POST(req: Request) {
             address: order.address,
             totalAmount: order.totalAmount,
             paymentMethod: order.paymentMethod || existing.paymentMethod,
-            status: order.status === "CANCELADO" ? "CANCELADO" : existing.status,
+            status: order.status === "CANCELADO" ? "CANCELADO" : (isHistorical ? "ENTREGUE" : existing.status),
             itemsCount: order.itemsCount !== undefined ? Number(order.itemsCount) : existing.itemsCount,
           }
         });
@@ -102,7 +110,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: true, message: "Pedido já finalizado/entregue" });
     }
 
-    // Criar novo registro de entrega
+    // Criar novo registro de entrega (de hoje ou histórico)
     const delivery = await prisma.delivery.create({
       data: {
         orderNumber: order.orderNumber,
@@ -111,9 +119,11 @@ export async function POST(req: Request) {
         totalAmount: order.totalAmount || 0,
         paymentMethod: order.paymentMethod || null,
         deliveryFee: 0,
-        status: order.status || "PENDENTE",
-        observations: "Importado do GPlus",
+        status: order.status === "CANCELADO" ? "CANCELADO" : (isHistorical ? "ENTREGUE" : (order.status || "PENDENTE")),
+        observations: isHistorical ? "Histórico Importado do GPlus" : "Importado do GPlus",
         itemsCount: order.itemsCount !== undefined ? Number(order.itemsCount) : 1,
+        scannedAt: orderDate,
+        deliveredAt: isHistorical ? orderDate : undefined,
       },
     });
 
