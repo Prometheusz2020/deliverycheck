@@ -14,16 +14,18 @@ echo [1] Ver Estatisticas de HOJE e do MES ATUAL
 echo [2] Ver Estatisticas de um DIA especifico (Ex: 2026-09-07)
 echo [3] Ver Estatisticas de um MES especifico (Ex: 2026-09)
 echo [4] Ver Estatisticas dos ULTIMOS 10 ANOS (Acumulado Completo)
-echo [5] Sair
+echo [5] Sincronizar Historico Antigo do Firebird (1 mes, 1 ano, 10 anos)
+echo [6] Sair
 echo.
 echo ====================================================================
-set /p OPC="Escolha uma opcao (1-5): "
+set /p OPC="Escolha uma opcao (1-6): "
 
 if "%OPC%"=="1" goto HOJE
 if "%OPC%"=="2" goto DIA
 if "%OPC%"=="3" goto MES
 if "%OPC%"=="4" goto ANOS
-if "%OPC%"=="5" exit
+if "%OPC%"=="5" call sincronizar_historico.bat & goto MENU
+if "%OPC%"=="6" exit
 echo Opcao invalida! Tente novamente.
 timeout /t 2 > nul
 goto MENU
