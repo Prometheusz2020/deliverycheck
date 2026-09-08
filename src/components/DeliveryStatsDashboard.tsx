@@ -5,33 +5,41 @@ import { DeliveryStatsReport } from "@/lib/types";
 import { 
   BarChart3, Calendar, Clock, DollarSign, Package, 
   TrendingUp, Users, RefreshCw, CheckCircle2, AlertTriangle, 
-  XCircle, Truck, Layers
+  XCircle, Truck, Layers, Loader2
 } from "lucide-react";
+import MonthlyLineChart from "./MonthlyLineChart";
 
 export default function DeliveryStatsDashboard() {
-  const [period, setPeriod] = useState<"day" | "month">("day");
+  const [period, setPeriod] = useState<"day" | "month" | "year">("day");
   const [selectedDate, setSelectedDate] = useState<string>(
     new Date().toISOString().split("T")[0]
   );
   const [selectedMonth, setSelectedMonth] = useState<string>(
     new Date().toISOString().slice(0, 7)
   );
+  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const [report, setReport] = useState<DeliveryStatsReport | null>(null);
+  const [historicalData, setHistoricalData] = useState<any>(null);
   const [loading, setLoading] = useState<boolean>(true);
 
   const fetchStats = useCallback(async () => {
     setLoading(true);
     try {
       const actions = await import("@/lib/actions");
-      const dateStr = period === "day" ? selectedDate : selectedMonth;
-      const res = await actions.getDeliveryStatsReport({ period, dateStr });
-      setReport(res);
+      if (period === "year") {
+        const resHist = await actions.getHistoricalDeliveryStats(selectedYear);
+        setHistoricalData(resHist);
+      } else {
+        const dateStr = period === "day" ? selectedDate : selectedMonth;
+        const res = await actions.getDeliveryStatsReport({ period, dateStr });
+        setReport(res);
+      }
     } catch (err) {
       console.error("Erro ao carregar estatísticas:", err);
     } finally {
       setLoading(false);
     }
-  }, [period, selectedDate, selectedMonth]);
+  }, [period, selectedDate, selectedMonth, selectedYear]);
 
   useEffect(() => {
     fetchStats();
@@ -58,13 +66,13 @@ export default function DeliveryStatsDashboard() {
               VOLUME & ESTATÍSTICAS DE ENTREGA
             </h2>
             <p style={{ fontSize: '11px', color: 'var(--text-muted)', margin: 0 }}>
-              Análise completa de entregas, faturamento, taxas e motoboys
+              Análise completa de entregas, faturamento, taxas, motoboys e gráfico de evolução
             </p>
           </div>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
-          {/* Seletor de Tipo (Dia vs Mês) */}
+          {/* Seletor de Tipo (Dia vs Mês vs Ano/Histórico) */}
           <div style={{ display: 'flex', background: 'var(--surface-high)', padding: '0.3rem', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.08)' }}>
             <button
               onClick={() => setPeriod("day")}
@@ -80,29 +88,38 @@ export default function DeliveryStatsDashboard() {
             >
               <Calendar size={15} /> Por Mês
             </button>
+            <button
+              onClick={() => setPeriod("year")}
+              className={period === "year" ? "btn-main" : "btn-outline"}
+              style={{ padding: '0.5rem 1.2rem', fontSize: '12px', borderRadius: '8px', marginLeft: '0.3rem' }}
+            >
+              <TrendingUp size={15} /> Por Ano / Histórico
+            </button>
           </div>
 
-          {/* Campo de Data ou Mês */}
-          <div style={{ display: 'flex', alignItems: 'center', background: 'var(--surface-high)', padding: '0.4rem 0.8rem', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.08)', gap: '8px' }}>
-            <Calendar size={16} style={{ color: 'var(--primary)' }} />
-            {period === "day" ? (
-              <input
-                type="date"
-                value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
-                className="input-premium"
-                style={{ padding: '0.2rem', background: 'transparent', border: 'none', color: 'var(--text)', fontSize: '13px', cursor: 'pointer' }}
-              />
-            ) : (
-              <input
-                type="month"
-                value={selectedMonth}
-                onChange={(e) => setSelectedMonth(e.target.value)}
-                className="input-premium"
-                style={{ padding: '0.2rem', background: 'transparent', border: 'none', color: 'var(--text)', fontSize: '13px', cursor: 'pointer' }}
-              />
-            )}
-          </div>
+          {/* Campo de Data ou Mês se não for ano */}
+          {period !== "year" && (
+            <div style={{ display: 'flex', alignItems: 'center', background: 'var(--surface-high)', padding: '0.4rem 0.8rem', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.08)', gap: '8px' }}>
+              <Calendar size={16} style={{ color: 'var(--primary)' }} />
+              {period === "day" ? (
+                <input
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  className="input-premium"
+                  style={{ padding: '0.2rem', background: 'transparent', border: 'none', color: 'var(--text)', fontSize: '13px', cursor: 'pointer' }}
+                />
+              ) : (
+                <input
+                  type="month"
+                  value={selectedMonth}
+                  onChange={(e) => setSelectedMonth(e.target.value)}
+                  className="input-premium"
+                  style={{ padding: '0.2rem', background: 'transparent', border: 'none', color: 'var(--text)', fontSize: '13px', cursor: 'pointer' }}
+                />
+              )}
+            </div>
+          )}
 
           <button
             onClick={fetchStats}
@@ -115,7 +132,55 @@ export default function DeliveryStatsDashboard() {
         </div>
       </div>
 
-      {report && (
+      {period === "year" && (
+        <>
+          {loading && !historicalData ? (
+            <div className="card-premium" style={{ padding: '4rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+              <Loader2 size={36} className="animate-spin" style={{ margin: '0 auto 1rem auto', color: 'var(--primary)' }} />
+              <p style={{ fontSize: '14px', fontWeight: 600 }}>Carregando estatísticas históricas de entregas...</p>
+            </div>
+          ) : (
+            <MonthlyLineChart
+              title="EVOLUÇÃO ANUAL DE ENTREGAS E FATURAMENTO"
+              subtitle="Gráfico de linhas com todos os 12 meses do ano e linha do tempo histórica"
+              data={(historicalData?.months || []).map((m: any) => ({
+                label: m.shortName,
+                fullLabel: `${m.fullName} de ${m.year}`,
+                val1: m.salesTotal,
+                val2: m.deliveredCount,
+                val3: m.totalFees,
+                count1: m.deliveredCount
+              }))}
+              historicalData={(historicalData?.historicalTimeline || []).map((h: any) => ({
+                label: h.label,
+                fullLabel: `${h.label} (${h.deliveredCount} entregues, ${formatCurrency(h.salesTotal)})`,
+                val1: h.salesTotal,
+                val2: h.deliveredCount,
+                val3: h.totalFees,
+                count1: h.deliveredCount
+              }))}
+              availableYears={historicalData?.availableYears || [new Date().getFullYear()]}
+              selectedYear={historicalData?.targetYear || selectedYear}
+              onYearChange={(yr) => {
+                setSelectedYear(yr);
+              }}
+              metric1Label="Faturamento Entregas (R$)"
+              metric2Label="Quantidade Entregues"
+              metric3Label="Total Taxas Motoboys"
+              isCurrency={true}
+              summaryCards={{
+                totalYear: historicalData?.summary?.yearSalesTotal || 0,
+                avgMonthly: historicalData?.summary?.avgMonthlySales || 0,
+                bestMonth: historicalData?.summary?.bestMonth || "-",
+                secondaryTotal: historicalData?.summary?.yearTotalFees || 0
+              }}
+            />
+          )}
+        </>
+      )}
+
+      {period !== "year" && report && (
+
         <>
           {/* Título do Relatório Selecionado */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

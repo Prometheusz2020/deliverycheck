@@ -50,7 +50,7 @@ echo ====================================================================
 echo  Sincronizando os ultimos %DIAS% dias do Firebird (GPLUS.FDB)...
 echo ====================================================================
 echo.
-node sync_local_gplus.js --days %DIAS% --once
+node sync_historico_gplus.js --days %DIAS%
 echo.
 echo Sincronizacao finalizada! Voce ja pode gerar relatorios.
 pause

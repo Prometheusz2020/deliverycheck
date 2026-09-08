@@ -4,13 +4,14 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { 
   Users, DollarSign, Plus, Trash2, Calendar, Search, 
   FileText, CheckCircle, UserPlus, Loader2, Phone, 
-  MapPin, Clock, X, Info, AlertTriangle, ArrowRight, CornerDownRight, Printer, RefreshCw, RotateCcw
+  MapPin, Clock, X, Info, AlertTriangle, ArrowRight, CornerDownRight, Printer, RefreshCw, RotateCcw, TrendingUp
 } from "lucide-react";
 import { 
   getCustomers, addCustomer, editCustomer, deleteCustomer, 
   addCreditSale, getCustomerDetails, deleteCreditSale, 
-  addPayment, deletePayment, getRecentCreditSales
+  addPayment, deletePayment, getRecentCreditSales, getHistoricalCreditStats
 } from "@/lib/credit-actions";
+import MonthlyLineChart from "./MonthlyLineChart";
 
 type CustomerType = {
   id: string;
@@ -66,11 +67,35 @@ type CustomerDetailsType = {
 };
 
 export default function CreditSalesDashboard({ selectedDate }: { selectedDate?: string } = {}) {
-  const [activeTab, setActiveTab] = useState<'customers' | 'new-sale' | 'new-payment' | 'deleted'>('customers');
+  const [activeTab, setActiveTab] = useState<'customers' | 'new-sale' | 'new-payment' | 'deleted' | 'analytics'>('customers');
   const [customers, setCustomers] = useState<CustomerType[]>([]);
   const [deletedDeliveries, setDeletedDeliveries] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+
+  // Estados para Análise de Gráfico de Linhas e Evolução Histórica
+  const [selectedChartYear, setSelectedChartYear] = useState<number>(new Date().getFullYear());
+  const [historicalCreditData, setHistoricalCreditData] = useState<any>(null);
+  const [isLoadingCreditAnalytics, setIsLoadingCreditAnalytics] = useState(false);
+
+  const fetchCreditAnalytics = useCallback(async (yr?: number) => {
+    setIsLoadingCreditAnalytics(true);
+    try {
+      const res = await getHistoricalCreditStats(yr || selectedChartYear);
+      setHistoricalCreditData(res);
+    } catch (err) {
+      console.error("Erro ao carregar análise de fiado:", err);
+    } finally {
+      setIsLoadingCreditAnalytics(false);
+    }
+  }, [selectedChartYear]);
+
+  useEffect(() => {
+    if (activeTab === 'analytics') {
+      fetchCreditAnalytics(selectedChartYear);
+    }
+  }, [activeTab, selectedChartYear, fetchCreditAnalytics]);
+
   
   // Detalhes do cliente selecionado
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
@@ -1076,6 +1101,16 @@ export default function CreditSalesDashboard({ selectedDate }: { selectedDate?: 
             style={{ padding: '0.5rem 1.2rem', fontSize: '11px', borderRadius: '6px', border: 'none', marginLeft: '0.2rem', height: '34px', background: activeTab === 'deleted' ? 'var(--danger)' : undefined }}
           >
             <Trash2 size={14} /> Comandas Deletadas ({deletedDeliveries.length})
+          </button>
+          <button 
+            onClick={() => {
+              setActiveTab('analytics');
+              fetchCreditAnalytics(selectedChartYear);
+            }} 
+            className={activeTab === 'analytics' ? 'btn-main' : 'btn-outline'} 
+            style={{ padding: '0.5rem 1.2rem', fontSize: '11px', borderRadius: '6px', border: 'none', marginLeft: '0.2rem', height: '34px' }}
+          >
+            <TrendingUp size={14} /> Gráficos & Evolução Histórica
           </button>
         </div>
 
@@ -2443,6 +2478,57 @@ export default function CreditSalesDashboard({ selectedDate }: { selectedDate?: 
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/* 5. ABA DE GRÁFICOS DE LINHAS & EVOLUÇÃO HISTÓRICA */}
+      {activeTab === 'analytics' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          {isLoadingCreditAnalytics && !historicalCreditData ? (
+            <div className="card-premium" style={{ padding: '4rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+              <Loader2 size={36} className="animate-spin" style={{ margin: '0 auto 1rem auto', color: 'var(--primary)' }} />
+              <p style={{ fontSize: '14px', fontWeight: 600 }}>Carregando dados estatísticos e histórico por meses...</p>
+            </div>
+          ) : (
+            <MonthlyLineChart
+              title="GRÁFICO DE FIADO: MESES DO ANO & EVOLUÇÃO HISTÓRICA"
+              subtitle="Análise comparativa das vendas a prazo (fiado) vs. pagamentos recebidos por mês"
+              data={(historicalCreditData?.months || []).map((m: any) => ({
+                label: m.shortName,
+                fullLabel: `${m.fullName} de ${m.year}`,
+                val1: m.salesTotal,
+                val2: m.paymentsTotal,
+                val3: m.netBalance,
+                count1: m.salesCount,
+                count2: m.paymentsCount
+              }))}
+              historicalData={(historicalCreditData?.historicalTimeline || []).map((h: any) => ({
+                label: h.label,
+                fullLabel: `${h.label} (${h.salesCount} vendas, ${h.paymentsCount} pagamentos)`,
+                val1: h.salesTotal,
+                val2: h.paymentsTotal,
+                val3: h.netBalance,
+                count1: h.salesCount,
+                count2: h.paymentsCount
+              }))}
+              availableYears={historicalCreditData?.availableYears || [new Date().getFullYear()]}
+              selectedYear={historicalCreditData?.targetYear || selectedChartYear}
+              onYearChange={(yr) => {
+                setSelectedChartYear(yr);
+                fetchCreditAnalytics(yr);
+              }}
+              metric1Label="Vendas Fiado / Lançamentos"
+              metric2Label="Pagamentos Recebidos"
+              metric3Label="Saldo Devedor Gerado"
+              isCurrency={true}
+              summaryCards={{
+                totalYear: historicalCreditData?.summary?.yearSalesTotal || 0,
+                avgMonthly: historicalCreditData?.summary?.avgMonthlySales || 0,
+                bestMonth: historicalCreditData?.summary?.bestSalesMonth || "-",
+                secondaryTotal: historicalCreditData?.summary?.yearPaymentsTotal || 0
+              }}
+            />
+          )}
         </div>
       )}
 

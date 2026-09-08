@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "sync": "node sync_local_gplus.js",
+    "sync:historico": "node sync_historico_gplus.js",
     "stats": "node relatorio_estatisticas.js",
     "postinstall": "prisma generate"
   },

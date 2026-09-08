@@ -388,3 +388,179 @@ export async function getRecentCreditSales(limit: number = 100) {
     return [];
   }
 }
+
+export async function getHistoricalCreditStats(selectedYearInput?: number) {
+  try {
+    const currentYear = new Date().getFullYear();
+
+    const [sales, payments] = await Promise.all([
+      prisma.creditSale.findMany({
+        select: { date: true, totalAmount: true }
+      }),
+      prisma.payment.findMany({
+        select: { date: true, amount: true }
+      })
+    ]);
+
+    // Anos disponíveis
+    const yearsSet = new Set<number>();
+    yearsSet.add(currentYear);
+
+    sales.forEach(s => {
+      if (s.date) yearsSet.add(new Date(s.date).getFullYear());
+    });
+    payments.forEach(p => {
+      if (p.date) yearsSet.add(new Date(p.date).getFullYear());
+    });
+
+    const availableYears = Array.from(yearsSet).sort((a, b) => a - b);
+    const targetYear = selectedYearInput || (availableYears.includes(currentYear) ? currentYear : availableYears[availableYears.length - 1]);
+
+    // Mês a Mês do Ano Selecionado (12 meses fixed)
+    const monthNamesShort = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+    const monthNamesFull = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+
+    const yearMonths = monthNamesShort.map((shortName, idx) => ({
+      monthIndex: idx,
+      shortName,
+      fullName: monthNamesFull[idx],
+      year: targetYear,
+      periodKey: `${targetYear}-${String(idx + 1).padStart(2, '0')}`,
+      salesTotal: 0,
+      paymentsTotal: 0,
+      netBalance: 0,
+      salesCount: 0,
+      paymentsCount: 0
+    }));
+
+    // Agrupamento temporal completo (Evolução Histórica Multi-Anos)
+    const timelineMap: Record<string, {
+      periodKey: string;
+      label: string;
+      year: number;
+      monthIndex: number;
+      salesTotal: number;
+      paymentsTotal: number;
+      netBalance: number;
+      salesCount: number;
+      paymentsCount: number;
+    }> = {};
+
+    sales.forEach(s => {
+      const d = new Date(s.date);
+      const yr = d.getFullYear();
+      const mo = d.getMonth();
+      const amt = s.totalAmount || 0;
+
+      // Se for do ano alvo
+      if (yr === targetYear && yearMonths[mo]) {
+        yearMonths[mo].salesTotal += amt;
+        yearMonths[mo].salesCount += 1;
+      }
+
+      // Timeline geral
+      const key = `${yr}-${String(mo + 1).padStart(2, '0')}`;
+      if (!timelineMap[key]) {
+        timelineMap[key] = {
+          periodKey: key,
+          label: `${monthNamesShort[mo]}/${String(yr).slice(-2)}`,
+          year: yr,
+          monthIndex: mo,
+          salesTotal: 0,
+          paymentsTotal: 0,
+          netBalance: 0,
+          salesCount: 0,
+          paymentsCount: 0
+        };
+      }
+      timelineMap[key].salesTotal += amt;
+      timelineMap[key].salesCount += 1;
+    });
+
+    payments.forEach(p => {
+      const d = new Date(p.date);
+      const yr = d.getFullYear();
+      const mo = d.getMonth();
+      const amt = p.amount || 0;
+
+      // Se for do ano alvo
+      if (yr === targetYear && yearMonths[mo]) {
+        yearMonths[mo].paymentsTotal += amt;
+        yearMonths[mo].paymentsCount += 1;
+      }
+
+      // Timeline geral
+      const key = `${yr}-${String(mo + 1).padStart(2, '0')}`;
+      if (!timelineMap[key]) {
+        timelineMap[key] = {
+          periodKey: key,
+          label: `${monthNamesShort[mo]}/${String(yr).slice(-2)}`,
+          year: yr,
+          monthIndex: mo,
+          salesTotal: 0,
+          paymentsTotal: 0,
+          netBalance: 0,
+          salesCount: 0,
+          paymentsCount: 0
+        };
+      }
+      timelineMap[key].paymentsTotal += amt;
+      timelineMap[key].paymentsCount += 1;
+    });
+
+    // Calcular saldos líquidos
+    yearMonths.forEach(m => {
+      m.netBalance = m.salesTotal - m.paymentsTotal;
+    });
+
+    const historicalTimeline = Object.values(timelineMap)
+      .map(item => ({
+        ...item,
+        netBalance: item.salesTotal - item.paymentsTotal
+      }))
+      .sort((a, b) => a.periodKey.localeCompare(b.periodKey));
+
+    // Métricas do Ano Selecionado
+    const yearSalesTotal = yearMonths.reduce((acc, m) => acc + m.salesTotal, 0);
+    const yearPaymentsTotal = yearMonths.reduce((acc, m) => acc + m.paymentsTotal, 0);
+    const yearNetBalance = yearSalesTotal - yearPaymentsTotal;
+    const avgMonthlySales = yearSalesTotal / 12;
+
+    let bestSalesMonth = yearMonths[0];
+    yearMonths.forEach(m => {
+      if (m.salesTotal > bestSalesMonth.salesTotal) {
+        bestSalesMonth = m;
+      }
+    });
+
+    return {
+      availableYears,
+      targetYear,
+      months: yearMonths,
+      historicalTimeline,
+      summary: {
+        yearSalesTotal,
+        yearPaymentsTotal,
+        yearNetBalance,
+        avgMonthlySales,
+        bestSalesMonth: bestSalesMonth.salesTotal > 0 ? bestSalesMonth.fullName : "Nenhum"
+      }
+    };
+  } catch (error) {
+    console.error("Error in getHistoricalCreditStats:", error);
+    return {
+      availableYears: [new Date().getFullYear()],
+      targetYear: new Date().getFullYear(),
+      months: [],
+      historicalTimeline: [],
+      summary: {
+        yearSalesTotal: 0,
+        yearPaymentsTotal: 0,
+        yearNetBalance: 0,
+        avgMonthlySales: 0,
+        bestSalesMonth: "-"
+      }
+    };
+  }
+}
+

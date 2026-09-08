@@ -699,3 +699,138 @@ export async function getDeliveryStatsReport(params: {
   };
 }
 
+export async function getHistoricalDeliveryStats(selectedYearInput?: number) {
+  try {
+    const currentYear = new Date().getFullYear();
+    const deliveries = await prisma.delivery.findMany({
+      select: { scannedAt: true, totalAmount: true, status: true, deliveryFee: true, itemsCount: true }
+    });
+
+    const yearsSet = new Set<number>();
+    yearsSet.add(currentYear);
+    deliveries.forEach(d => {
+      if (d.scannedAt) yearsSet.add(new Date(d.scannedAt).getFullYear());
+    });
+
+    const availableYears = Array.from(yearsSet).sort((a, b) => a - b);
+    const targetYear = selectedYearInput || (availableYears.includes(currentYear) ? currentYear : availableYears[availableYears.length - 1]);
+
+    const monthNamesShort = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+    const monthNamesFull = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+
+    const yearMonths = monthNamesShort.map((shortName, idx) => ({
+      monthIndex: idx,
+      shortName,
+      fullName: monthNamesFull[idx],
+      year: targetYear,
+      periodKey: `${targetYear}-${String(idx + 1).padStart(2, '0')}`,
+      salesTotal: 0,
+      deliveredCount: 0,
+      totalOrders: 0,
+      totalFees: 0,
+      itemsCount: 0
+    }));
+
+    const timelineMap: Record<string, {
+      periodKey: string;
+      label: string;
+      year: number;
+      monthIndex: number;
+      salesTotal: number;
+      deliveredCount: number;
+      totalOrders: number;
+      totalFees: number;
+      itemsCount: number;
+    }> = {};
+
+    deliveries.forEach(d => {
+      const dateObj = new Date(d.scannedAt);
+      const yr = dateObj.getFullYear();
+      const mo = dateObj.getMonth();
+      const amt = d.totalAmount || 0;
+      const fee = d.deliveryFee || 0;
+      const items = d.itemsCount || 1;
+      const isDelivered = d.status === "ENTREGUE";
+
+      if (yr === targetYear && yearMonths[mo]) {
+        yearMonths[mo].totalOrders++;
+        if (isDelivered) {
+          yearMonths[mo].deliveredCount++;
+          yearMonths[mo].salesTotal += amt;
+          yearMonths[mo].totalFees += fee;
+          yearMonths[mo].itemsCount += items;
+        }
+      }
+
+      const key = `${yr}-${String(mo + 1).padStart(2, '0')}`;
+      if (!timelineMap[key]) {
+        timelineMap[key] = {
+          periodKey: key,
+          label: `${monthNamesShort[mo]}/${String(yr).slice(-2)}`,
+          year: yr,
+          monthIndex: mo,
+          salesTotal: 0,
+          deliveredCount: 0,
+          totalOrders: 0,
+          totalFees: 0,
+          itemsCount: 0
+        };
+      }
+      timelineMap[key].totalOrders++;
+      if (isDelivered) {
+        timelineMap[key].deliveredCount++;
+        timelineMap[key].salesTotal += amt;
+        timelineMap[key].totalFees += fee;
+        timelineMap[key].itemsCount += items;
+      }
+    });
+
+    const historicalTimeline = Object.values(timelineMap).sort((a, b) => a.periodKey.localeCompare(b.periodKey));
+
+    const yearSalesTotal = yearMonths.reduce((acc, m) => acc + m.salesTotal, 0);
+    const yearDeliveredCount = yearMonths.reduce((acc, m) => acc + m.deliveredCount, 0);
+    const yearTotalOrders = yearMonths.reduce((acc, m) => acc + m.totalOrders, 0);
+    const yearTotalFees = yearMonths.reduce((acc, m) => acc + m.totalFees, 0);
+    const avgMonthlySales = yearSalesTotal / 12;
+
+    let bestMonth = yearMonths[0];
+    yearMonths.forEach(m => {
+      if (m.salesTotal > bestMonth.salesTotal) {
+        bestMonth = m;
+      }
+    });
+
+    return {
+      availableYears,
+      targetYear,
+      months: yearMonths,
+      historicalTimeline,
+      summary: {
+        yearSalesTotal,
+        yearDeliveredCount,
+        yearTotalOrders,
+        yearTotalFees,
+        avgMonthlySales,
+        bestMonth: bestMonth.salesTotal > 0 ? bestMonth.fullName : "Nenhum"
+      }
+    };
+  } catch (error) {
+    console.error("Error in getHistoricalDeliveryStats:", error);
+    return {
+      availableYears: [new Date().getFullYear()],
+      targetYear: new Date().getFullYear(),
+      months: [],
+      historicalTimeline: [],
+      summary: {
+        yearSalesTotal: 0,
+        yearDeliveredCount: 0,
+        yearTotalOrders: 0,
+        yearTotalFees: 0,
+        avgMonthlySales: 0,
+        bestMonth: "-"
+      }
+    };
+  }
+}
+
+
