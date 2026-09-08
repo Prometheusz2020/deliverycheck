@@ -234,7 +234,7 @@ export default function DeliveryStatsDashboard() {
               </div>
             </div>
 
-            {/* KPI Específico: Média por Dia */}
+            {/* KPI Específico: Média por Dia (Quantidade de Entregas) */}
             <div className="card-premium" style={{ borderTop: '4px solid #a855f7', padding: '1.4rem', background: 'rgba(168, 85, 247, 0.03)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', color: '#a855f7', marginBottom: '1rem' }}>
                 <Calendar size={24} />
@@ -243,38 +243,15 @@ export default function DeliveryStatsDashboard() {
                 </span>
               </div>
               <p style={{ color: '#a855f7', fontSize: '10px', fontWeight: 900, textTransform: 'uppercase', margin: 0 }}>
-                MÉDIA POR DIA NO PERÍODO
+                MÉDIA DE ENTREGAS POR DIA
               </p>
               <p style={{ fontSize: '1.8rem', fontWeight: 900, margin: '4px 0 0 0', lineHeight: 1, color: '#a855f7' }}>
-                {formatCurrency(
-                  period === "day" 
-                    ? report.totalAmount 
-                    : (report.totalAmount / (period === "month" ? (new Date(parseInt(selectedMonth.split("-")[0]), parseInt(selectedMonth.split("-")[1]), 0).getDate()) : 30))
-                )}
+                {(
+                  report.deliveredOrders / (period === "day" ? 1 : (period === "month" ? (new Date(parseInt(selectedMonth.split("-")[0]), parseInt(selectedMonth.split("-")[1]), 0).getDate()) : 30))
+                ).toFixed(1)} <span style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text-muted)' }}>entregas/dia</span>
               </p>
               <div style={{ marginTop: '1rem', paddingTop: '0.8rem', borderTop: '1px solid rgba(255,255,255,0.05)', fontSize: '11px', color: 'var(--text-muted)' }}>
-                Média de {
-                  (report.deliveredOrders / (period === "day" ? 1 : (period === "month" ? (new Date(parseInt(selectedMonth.split("-")[0]), parseInt(selectedMonth.split("-")[1]), 0).getDate()) : 30))).toFixed(1)
-                } entregas/dia
-              </div>
-            </div>
-
-            {/* KPI 3: Taxas de Motoboys */}
-            <div className="card-premium" style={{ borderTop: '4px solid var(--accent)', padding: '1.4rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--accent)', marginBottom: '1rem' }}>
-                <TrendingUp size={24} />
-                <span style={{ fontSize: '10px', fontWeight: 900, background: 'rgba(57,255,20,0.12)', padding: '2px 8px', borderRadius: '6px' }}>
-                  A REPASSAR
-                </span>
-              </div>
-              <p style={{ color: 'var(--text-muted)', fontSize: '10px', fontWeight: 900, textTransform: 'uppercase', margin: 0 }}>
-                TAXAS DOS MOTOBOYS
-              </p>
-              <p style={{ fontSize: '1.8rem', fontWeight: 900, margin: '4px 0 0 0', lineHeight: 1, color: 'var(--accent)' }}>
-                {formatCurrency(report.totalFees)}
-              </p>
-              <div style={{ marginTop: '1rem', paddingTop: '0.8rem', borderTop: '1px solid rgba(255,255,255,0.05)', fontSize: '11px', color: 'var(--text-muted)' }}>
-                Total acumulado das entregas
+                Calculado com base em comandas concluídas
               </div>
             </div>
 

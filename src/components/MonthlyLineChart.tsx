@@ -29,6 +29,7 @@ interface MonthlyLineChartProps {
     totalYear: number;
     avgMonthly: number;
     avgDaily?: number;
+    avgDailyCount?: number;
     bestMonth: string;
     secondaryTotal?: number;
   };
@@ -134,10 +135,10 @@ export default function MonthlyLineChart({
 
   const hasMetric2 = activeData.some(d => d.val2 !== undefined && d.val2 > 0);
 
-  // Cálculo da média por dia considerando o período selecionado
-  const calculatedAvgDaily = useMemo(() => {
+  // Cálculo da média de entregas/vendas por dia considerando o período selecionado
+  const calculatedAvgDailyCount = useMemo(() => {
     if (!summaryCards) return 0;
-    if (summaryCards.avgDaily !== undefined) return summaryCards.avgDaily;
+    if (summaryCards.avgDailyCount !== undefined) return summaryCards.avgDailyCount;
     const currentYear = new Date().getFullYear();
     let days = 365;
     if (selectedYear === currentYear) {
@@ -148,8 +149,9 @@ export default function MonthlyLineChart({
       const isLeap = (selectedYear % 4 === 0 && selectedYear % 100 !== 0) || (selectedYear % 400 === 0);
       days = isLeap ? 366 : 365;
     }
-    return summaryCards.totalYear / days;
-  }, [summaryCards, selectedYear]);
+    const totalCount = data.reduce((sum, item) => sum + (item.count1 || 0), 0);
+    return totalCount > 0 ? totalCount / days : 0;
+  }, [summaryCards, selectedYear, data]);
 
   return (
     <div className="card-premium animate-entrance" style={{ padding: '1.8rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -213,7 +215,7 @@ export default function MonthlyLineChart({
         </div>
       </div>
 
-      {/* Cards de Resumo KPIs com Card de Média por Dia */}
+      {/* Cards de Resumo KPIs com Card de Média de Entregas por Dia */}
       {summaryCards && viewMode === "year" && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '1rem' }}>
           <div className="card-premium" style={{ padding: '1rem 1.2rem', borderTop: '3px solid var(--primary)', background: 'rgba(0, 242, 255, 0.03)' }}>
@@ -221,21 +223,21 @@ export default function MonthlyLineChart({
             <p style={{ fontSize: '1.4rem', fontWeight: 900, color: 'var(--primary)', margin: '4px 0 0 0' }}>{formatValue(summaryCards.totalYear)}</p>
           </div>
 
-          {/* Card Especial: Média por Dia de acordo com o Período */}
+          {/* Card Especial: Média de Entregas/Vendas por Dia */}
           <div className="card-premium" style={{ padding: '1rem 1.2rem', borderTop: '3px solid #a855f7', background: 'rgba(168, 85, 247, 0.05)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
               <p style={{ fontSize: '10px', color: '#a855f7', fontWeight: 900, textTransform: 'uppercase', margin: 0, display: 'flex', alignItems: 'center', gap: '4px' }}>
                 <Calendar size={12} /> MÉDIA POR DIA
               </p>
               <span style={{ fontSize: '9px', fontWeight: 800, background: 'rgba(168, 85, 247, 0.15)', color: '#a855f7', padding: '1px 6px', borderRadius: '4px' }}>
-                DIÁRIO
+                ENTREGAS/DIA
               </span>
             </div>
             <p style={{ fontSize: '1.5rem', fontWeight: 900, color: '#a855f7', margin: '4px 0 0 0' }}>
-              {formatValue(calculatedAvgDaily)}
+              {calculatedAvgDailyCount.toFixed(1)} <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)' }}>/ dia</span>
             </p>
             <p style={{ fontSize: '9px', color: 'var(--text-muted)', margin: '2px 0 0 0' }}>
-              Média calculada no ano de {selectedYear}
+              Média de comandas por dia em {selectedYear}
             </p>
           </div>
 
