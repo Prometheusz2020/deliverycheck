@@ -28,6 +28,7 @@ interface MonthlyLineChartProps {
   summaryCards?: {
     totalYear: number;
     avgMonthly: number;
+    avgDaily?: number;
     bestMonth: string;
     secondaryTotal?: number;
   };
@@ -133,6 +134,23 @@ export default function MonthlyLineChart({
 
   const hasMetric2 = activeData.some(d => d.val2 !== undefined && d.val2 > 0);
 
+  // Cálculo da média por dia considerando o período selecionado
+  const calculatedAvgDaily = useMemo(() => {
+    if (!summaryCards) return 0;
+    if (summaryCards.avgDaily !== undefined) return summaryCards.avgDaily;
+    const currentYear = new Date().getFullYear();
+    let days = 365;
+    if (selectedYear === currentYear) {
+      const startOfYear = new Date(currentYear, 0, 1);
+      const now = new Date();
+      days = Math.max(1, Math.floor((now.getTime() - startOfYear.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+    } else {
+      const isLeap = (selectedYear % 4 === 0 && selectedYear % 100 !== 0) || (selectedYear % 400 === 0);
+      days = isLeap ? 366 : 365;
+    }
+    return summaryCards.totalYear / days;
+  }, [summaryCards, selectedYear]);
+
   return (
     <div className="card-premium animate-entrance" style={{ padding: '1.8rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       {/* Cabeçalho do Gráfico */}
@@ -195,29 +213,51 @@ export default function MonthlyLineChart({
         </div>
       </div>
 
-      {/* Cards de Resumo KPIs se disponíveis */}
+      {/* Cards de Resumo KPIs com Card de Média por Dia */}
       {summaryCards && viewMode === "year" && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '1rem' }}>
           <div className="card-premium" style={{ padding: '1rem 1.2rem', borderTop: '3px solid var(--primary)', background: 'rgba(0, 242, 255, 0.03)' }}>
-            <p style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: 900, textTransform: 'uppercase', margin: 0 }}>Total Acumulado em {selectedYear}</p>
-            <p style={{ fontSize: '1.5rem', fontWeight: 900, color: 'var(--primary)', margin: '4px 0 0 0' }}>{formatValue(summaryCards.totalYear)}</p>
+            <p style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: 900, textTransform: 'uppercase', margin: 0 }}>Total Acumulado ({selectedYear})</p>
+            <p style={{ fontSize: '1.4rem', fontWeight: 900, color: 'var(--primary)', margin: '4px 0 0 0' }}>{formatValue(summaryCards.totalYear)}</p>
           </div>
+
+          {/* Card Especial: Média por Dia de acordo com o Período */}
+          <div className="card-premium" style={{ padding: '1rem 1.2rem', borderTop: '3px solid #a855f7', background: 'rgba(168, 85, 247, 0.05)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
+              <p style={{ fontSize: '10px', color: '#a855f7', fontWeight: 900, textTransform: 'uppercase', margin: 0, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <Calendar size={12} /> MÉDIA POR DIA
+              </p>
+              <span style={{ fontSize: '9px', fontWeight: 800, background: 'rgba(168, 85, 247, 0.15)', color: '#a855f7', padding: '1px 6px', borderRadius: '4px' }}>
+                DIÁRIO
+              </span>
+            </div>
+            <p style={{ fontSize: '1.5rem', fontWeight: 900, color: '#a855f7', margin: '4px 0 0 0' }}>
+              {formatValue(calculatedAvgDaily)}
+            </p>
+            <p style={{ fontSize: '9px', color: 'var(--text-muted)', margin: '2px 0 0 0' }}>
+              Média calculada no ano de {selectedYear}
+            </p>
+          </div>
+
           <div className="card-premium" style={{ padding: '1rem 1.2rem', borderTop: '3px solid var(--accent)', background: 'rgba(57, 255, 20, 0.03)' }}>
             <p style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: 900, textTransform: 'uppercase', margin: 0 }}>Média Mensal</p>
-            <p style={{ fontSize: '1.5rem', fontWeight: 900, color: 'var(--accent)', margin: '4px 0 0 0' }}>{formatValue(summaryCards.avgMonthly)}</p>
+            <p style={{ fontSize: '1.4rem', fontWeight: 900, color: 'var(--accent)', margin: '4px 0 0 0' }}>{formatValue(summaryCards.avgMonthly)}</p>
           </div>
+
           <div className="card-premium" style={{ padding: '1rem 1.2rem', borderTop: '3px solid var(--warning)', background: 'rgba(255, 149, 0, 0.03)' }}>
             <p style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: 900, textTransform: 'uppercase', margin: 0 }}>Melhor Mês do Ano</p>
             <p style={{ fontSize: '1.3rem', fontWeight: 900, color: 'var(--warning)', margin: '4px 0 0 0' }}>{summaryCards.bestMonth}</p>
           </div>
+
           {summaryCards.secondaryTotal !== undefined && (
             <div className="card-premium" style={{ padding: '1rem 1.2rem', borderTop: '3px solid var(--success)', background: 'rgba(52, 199, 89, 0.03)' }}>
-              <p style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: 900, textTransform: 'uppercase', margin: 0 }}>Total Pagamentos Recebidos</p>
-              <p style={{ fontSize: '1.5rem', fontWeight: 900, color: 'var(--success)', margin: '4px 0 0 0' }}>{formatValue(summaryCards.secondaryTotal)}</p>
+              <p style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: 900, textTransform: 'uppercase', margin: 0 }}>Pagamentos Recebidos</p>
+              <p style={{ fontSize: '1.4rem', fontWeight: 900, color: 'var(--success)', margin: '4px 0 0 0' }}>{formatValue(summaryCards.secondaryTotal)}</p>
             </div>
           )}
         </div>
       )}
+
 
       {/* Legenda e Seleção de Séries de Linha */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>

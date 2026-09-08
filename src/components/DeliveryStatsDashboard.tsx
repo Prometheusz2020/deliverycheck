@@ -234,6 +234,31 @@ export default function DeliveryStatsDashboard() {
               </div>
             </div>
 
+            {/* KPI Específico: Média por Dia */}
+            <div className="card-premium" style={{ borderTop: '4px solid #a855f7', padding: '1.4rem', background: 'rgba(168, 85, 247, 0.03)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#a855f7', marginBottom: '1rem' }}>
+                <Calendar size={24} />
+                <span style={{ fontSize: '10px', fontWeight: 900, background: 'rgba(168, 85, 247, 0.15)', padding: '2px 8px', borderRadius: '6px' }}>
+                  {period === "day" ? "HOJE" : "DIÁRIO"}
+                </span>
+              </div>
+              <p style={{ color: '#a855f7', fontSize: '10px', fontWeight: 900, textTransform: 'uppercase', margin: 0 }}>
+                MÉDIA POR DIA NO PERÍODO
+              </p>
+              <p style={{ fontSize: '1.8rem', fontWeight: 900, margin: '4px 0 0 0', lineHeight: 1, color: '#a855f7' }}>
+                {formatCurrency(
+                  period === "day" 
+                    ? report.totalAmount 
+                    : (report.totalAmount / (period === "month" ? (new Date(parseInt(selectedMonth.split("-")[0]), parseInt(selectedMonth.split("-")[1]), 0).getDate()) : 30))
+                )}
+              </p>
+              <div style={{ marginTop: '1rem', paddingTop: '0.8rem', borderTop: '1px solid rgba(255,255,255,0.05)', fontSize: '11px', color: 'var(--text-muted)' }}>
+                Média de {
+                  (report.deliveredOrders / (period === "day" ? 1 : (period === "month" ? (new Date(parseInt(selectedMonth.split("-")[0]), parseInt(selectedMonth.split("-")[1]), 0).getDate()) : 30))).toFixed(1)
+                } entregas/dia
+              </div>
+            </div>
+
             {/* KPI 3: Taxas de Motoboys */}
             <div className="card-premium" style={{ borderTop: '4px solid var(--accent)', padding: '1.4rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--accent)', marginBottom: '1rem' }}>
