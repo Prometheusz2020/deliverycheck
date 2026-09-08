@@ -254,25 +254,6 @@ export default function DeliveryStatsDashboard() {
                 Calculado com base em comandas concluídas
               </div>
             </div>
-
-            {/* KPI 4: Total de Marmitex / Itens */}
-            <div className="card-premium" style={{ borderTop: '4px solid var(--warning)', padding: '1.4rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--warning)', marginBottom: '1rem' }}>
-                <Package size={24} />
-                <span style={{ fontSize: '10px', fontWeight: 900, background: 'rgba(255,149,0,0.12)', padding: '2px 8px', borderRadius: '6px' }}>
-                  PRODUTOS
-                </span>
-              </div>
-              <p style={{ color: 'var(--text-muted)', fontSize: '10px', fontWeight: 900, textTransform: 'uppercase', margin: 0 }}>
-                TOTAL DE MARMITEX / ITENS
-              </p>
-              <p style={{ fontSize: '2rem', fontWeight: 900, margin: '4px 0 0 0', lineHeight: 1, color: 'var(--warning)' }}>
-                {report.totalItems} <span style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text-muted)' }}>unidades</span>
-              </p>
-              <div style={{ marginTop: '1rem', paddingTop: '0.8rem', borderTop: '1px solid rgba(255,255,255,0.05)', fontSize: '11px', color: 'var(--text-muted)' }}>
-                Média de {report.deliveredOrders > 0 ? (report.totalItems / report.deliveredOrders).toFixed(1) : 0} por comanda
-              </div>
-            </div>
           </div>
 
           {/* Gráfico Visual de Distribuição no Tempo (Horários / Dias) */}
