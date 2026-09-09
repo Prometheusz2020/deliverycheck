@@ -497,7 +497,8 @@ export default function GPlusManager({ session }: GPlusManagerProps) {
       const nome = `"${(p.nome || '').replace(/"/g, '""')}"`;
       const grupo = `"${(p.grupo || '').replace(/"/g, '""')}"`;
       const valor = p.valor !== undefined && p.valor !== null ? p.valor.toFixed(2).replace('.', ',') : "0,00";
-      const codigo = `"${(p.codigoDeBarras || '').replace(/"/g, '""')}"`;
+      const codigoRaw = p.codigoDeBarras ? String(p.codigoDeBarras).trim() : '';
+      const codigo = codigoRaw ? `="${codigoRaw.replace(/"/g, '""')}"` : '""';
       return `${nome};${grupo};${valor};${codigo}`;
     }).join("\r\n");
 

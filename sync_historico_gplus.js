@@ -317,18 +317,16 @@ async function runHistoricalSync() {
     const chunkSize = 30;
 
     if (totalDaysToSync > 30) {
-        console.log(`[+] Sincronizando ${totalDaysToSync} dias em lotes de ${chunkSize} dias...`);
+        console.log(`[+] Sincronizando ${totalDaysToSync} dias de entregas em lotes de ${chunkSize} dias...`);
         for (let current = totalDaysToSync; current > 0; current -= chunkSize) {
             const fromDays = current;
             const toDays = Math.max(0, current - chunkSize);
-            console.log(`[+] Processando bloco de dias (-${fromDays} até -${toDays})...`);
+            console.log(`[+] Processando bloco de entregas (-${fromDays} até -${toDays} dias)...`);
             await syncOrdersChunk(fromDays, toDays);
-            await syncFiadoChunk(fromDays, toDays);
             await new Promise(r => setTimeout(r, 150));
         }
     } else {
         await syncOrdersChunk(totalDaysToSync, 0);
-        await syncFiadoChunk(totalDaysToSync, 0);
     }
 
     console.log('\n===================================================');
