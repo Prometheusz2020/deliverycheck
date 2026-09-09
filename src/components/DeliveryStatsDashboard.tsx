@@ -157,7 +157,8 @@ export default function DeliveryStatsDashboard() {
                 val1: h.salesTotal,
                 val2: h.deliveredCount,
                 val3: h.totalFees,
-                count1: h.deliveredCount
+                count1: h.deliveredCount,
+                year: h.year
               }))}
               availableYears={historicalData?.availableYears || [new Date().getFullYear()]}
               selectedYear={historicalData?.targetYear || selectedYear}

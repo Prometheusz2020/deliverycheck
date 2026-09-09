@@ -2509,7 +2509,8 @@ export default function CreditSalesDashboard({ selectedDate }: { selectedDate?: 
                 val2: h.paymentsTotal,
                 val3: h.netBalance,
                 count1: h.salesCount,
-                count2: h.paymentsCount
+                count2: h.paymentsCount,
+                year: h.year
               }))}
               availableYears={historicalCreditData?.availableYears || [new Date().getFullYear()]}
               selectedYear={historicalCreditData?.targetYear || selectedChartYear}

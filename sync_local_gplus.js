@@ -151,10 +151,11 @@ async function syncAllOrdersFromToday(overrideDays = null) {
                 };
 
                 try {
-                    const response = await axios.post(`${VERCEL_URL}/api/sync/order`, {
-                        syncToken: SYNC_TOKEN,
-                        order: orderData
-                    });
+                    const response = await axios.post(
+                        `${VERCEL_URL}/api/sync/order`,
+                        { syncToken: SYNC_TOKEN, order: orderData },
+                        { timeout: 10000 }
+                    );
                     if (response.data && response.data.message) {
                         console.log(`[+] Pedido #${row.NUMERO_COMANDA} (${orderData.customerName}): ${response.data.message}`);
                     } else {
@@ -295,10 +296,11 @@ async function syncFiadoOrdersFromToday(overrideDays = null) {
                     };
 
                     try {
-                        const response = await axios.post(`${VERCEL_URL}/api/sync/credit-sale`, {
-                            syncToken: SYNC_TOKEN,
-                            creditSale: saleData
-                        });
+                        const response = await axios.post(
+                            `${VERCEL_URL}/api/sync/credit-sale`,
+                            { syncToken: SYNC_TOKEN, creditSale: saleData },
+                            { timeout: 10000 }
+                        );
                         if (response.data && response.data.message) {
                             console.log(`[+] FIADO Comanda #${orderNumber} (${customerName}): ${response.data.message}`);
                         } else {

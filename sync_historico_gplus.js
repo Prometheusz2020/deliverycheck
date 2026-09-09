@@ -96,6 +96,7 @@ function syncOrdersChunk(fromDays, toDays) {
 
                 console.log(`[+] [LOTE ENTREGAS] Encontradas ${result.length} entregas (-${fromDays} a -${toDays || 0} dias). Sincronizando...`);
 
+                const validOrders = [];
                 for (const row of result) {
                     let totalAmount = 0;
                     if (row.VALOR_FINAL !== null && row.VALOR_FINAL !== undefined) {
@@ -119,7 +120,7 @@ function syncOrdersChunk(fromDays, toDays) {
                     let itemsCount = Math.round(parseFloat(row.QUANTIDADE_ITENS || 1));
                     if (isNaN(itemsCount) || itemsCount <= 0) itemsCount = 1;
 
-                    const orderData = {
+                    validOrders.push({
                         orderNumber: `#${String(row.NUMERO_COMANDA).trim()}`,
                         customerName: (row.NOME_CLIENTE || "Cliente GPlus").trim(),
                         address: finalAddress,
@@ -128,15 +129,30 @@ function syncOrdersChunk(fromDays, toDays) {
                         itemsCount: itemsCount,
                         paymentMethod: row.TIPO_PAGAMENTO ? String(row.TIPO_PAGAMENTO).trim() : null,
                         date: row.DATA_VENDA
-                    };
+                    });
+                }
 
-                    try {
-                        await axios.post(`${VERCEL_URL}/api/sync/order`, {
-                            syncToken: SYNC_TOKEN,
-                            order: orderData
-                        });
-                    } catch (apiErr) {
-                        // ignora falhas pontuais de envio para manter o loop
+                // Envio em lotes concorrentes de 10 com timeout de 12s para evitar travamento
+                const BATCH_SIZE = 10;
+                for (let i = 0; i < validOrders.length; i += BATCH_SIZE) {
+                    const batch = validOrders.slice(i, i + BATCH_SIZE);
+                    await Promise.all(
+                        batch.map(async (orderData) => {
+                            try {
+                                await axios.post(
+                                    `${VERCEL_URL}/api/sync/order`,
+                                    { syncToken: SYNC_TOKEN, order: orderData },
+                                    { timeout: 12000 }
+                                );
+                            } catch (apiErr) {
+                                // Ignora timeouts/erros pontuais para não travar a sincronização
+                            }
+                        })
+                    );
+
+                    const processed = Math.min(i + BATCH_SIZE, validOrders.length);
+                    if (processed % 100 === 0 || processed === validOrders.length) {
+                        console.log(`    -> Progresso entregas: ${processed}/${validOrders.length}`);
                     }
                 }
 
@@ -246,37 +262,40 @@ function syncFiadoChunk(fromDays, toDays) {
                     }
 
                     const salesList = Object.values(salesById);
-                    let fiadoCount = 0;
-                    for (const sale of salesList) {
-                        const { gplusId, orderNumber, customerName, gplusCustomerId, date, isCanceled, fiadoAmount, fiadoTypes, hasFiado } = sale;
-                        if (hasFiado && fiadoAmount > 0 && !isCanceled) {
-                            fiadoCount++;
-                            const saleData = {
-                                gplusId: gplusId,
-                                orderNumber: orderNumber,
-                                customerName: customerName,
-                                gplusCustomerId: gplusCustomerId,
-                                totalAmount: fiadoAmount,
-                                date: date,
-                                notes: `Sincronizado do GPlus (Comanda #${orderNumber} via ${fiadoTypes.join(', ')})`,
-                                status: 'PENDENTE',
-                                isFiado: true,
-                                items: itemsByVenda[gplusId] || []
-                            };
+                    const validFiadoList = salesList.filter(s => s.hasFiado && s.fiadoAmount > 0 && !s.isCanceled);
 
-                            try {
-                                await axios.post(`${VERCEL_URL}/api/sync/credit-sale`, {
-                                    syncToken: SYNC_TOKEN,
-                                    creditSale: saleData
-                                });
-                            } catch (apiErr) {
-                                // ignora falhas pontuais
-                            }
+                    if (validFiadoList.length > 0) {
+                        console.log(`[+] [LOTE FIADO] Sincronizando ${validFiadoList.length} registros de FIADO (-${fromDays} a -${toDays || 0} dias)...`);
+                        const BATCH_SIZE = 10;
+                        for (let i = 0; i < validFiadoList.length; i += BATCH_SIZE) {
+                            const batch = validFiadoList.slice(i, i + BATCH_SIZE);
+                            await Promise.all(
+                                batch.map(async (sale) => {
+                                    const { gplusId, orderNumber, customerName, gplusCustomerId, date, fiadoAmount, fiadoTypes } = sale;
+                                    const saleData = {
+                                        gplusId: gplusId,
+                                        orderNumber: orderNumber,
+                                        customerName: customerName,
+                                        gplusCustomerId: gplusCustomerId,
+                                        totalAmount: fiadoAmount,
+                                        date: date,
+                                        notes: `Sincronizado do GPlus (Comanda #${orderNumber} via ${fiadoTypes.join(', ')})`,
+                                        status: 'PENDENTE',
+                                        isFiado: true,
+                                        items: itemsByVenda[gplusId] || []
+                                    };
+                                    try {
+                                        await axios.post(
+                                            `${VERCEL_URL}/api/sync/credit-sale`,
+                                            { syncToken: SYNC_TOKEN, creditSale: saleData },
+                                            { timeout: 12000 }
+                                        );
+                                    } catch (apiErr) {
+                                        // ignora falhas pontuais para não travar
+                                    }
+                                })
+                            );
                         }
-                    }
-
-                    if (fiadoCount > 0) {
-                        console.log(`[+] [LOTE FIADO] Sincronizados ${fiadoCount} registros de FIADO (-${fromDays} a -${toDays || 0} dias).`);
                     }
 
                     db.detach();
