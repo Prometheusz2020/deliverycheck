@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 
 export type ChartDataItem = {
-  label: string; // Ex: "Jan", "Fev" ou "Jan/24"
+  label: string; // Ex: "Jan", "Fev" ou "Jan/24" ou "2024"
   fullLabel?: string; // Ex: "Janeiro de 2026"
   val1: number; // Métrica primária (ex: Vendas Fiado ou Faturamento Entregas)
   val2?: number; // Métrica secundária (ex: Pagamentos Recebidos ou Qtd Entregas)
@@ -70,7 +70,7 @@ export default function MonthlyLineChart({
 
   // Estados específicos para Evolução Histórica
   const [historyYearFilter, setHistoryYearFilter] = useState<"all" | number>("all");
-  const [historyDisplayMode, setHistoryDisplayMode] = useState<"comparative" | "separated" | "timeline">("comparative");
+  const [historyDisplayMode, setHistoryDisplayMode] = useState<"timeline" | "comparative" | "separated">("timeline");
 
   const formatValue = (val: number) => {
     if (isCurrency) {
@@ -109,16 +109,46 @@ export default function MonthlyLineChart({
     return years;
   }, [yearlyDataMap, availableYears]);
 
-  // Dados ativos a exibir conforme os filtros selecionados
+  // Dados consolidados estritamente por Ano para o intervalo em Anos (2024, 2025, 2026...)
+  const yearlyAggregatedData = useMemo(() => {
+    if (!historicalData || historicalData.length === 0) return [];
+    
+    const sortedYears = [...historyYears].sort((a, b) => a - b);
+    
+    return sortedYears.map(yr => {
+      const items = yearlyDataMap[yr] || [];
+      const val1 = items.reduce((sum, i) => sum + (i.val1 || 0), 0);
+      const val2 = items.reduce((sum, i) => sum + (i.val2 || 0), 0);
+      const val3 = items.reduce((sum, i) => sum + (i.val3 || 0), 0);
+      const count1 = items.reduce((sum, i) => sum + (i.count1 || 0), 0);
+      const count2 = items.reduce((sum, i) => sum + (i.count2 || 0), 0);
+
+      return {
+        label: `${yr}`,
+        fullLabel: `Total Consolidado do Ano de ${yr}`,
+        val1,
+        val2,
+        val3,
+        count1,
+        count2,
+        year: yr
+      };
+    });
+  }, [historicalData, historyYears, yearlyDataMap]);
+
+  // Dados ativos a exibir (No histórico geral, sempre usa intervalos em Anos)
   const activeData = useMemo(() => {
     if (viewMode === "year") return data;
     if (historyYearFilter !== "all") {
       return yearlyDataMap[historyYearFilter] || [];
     }
+    if (historyDisplayMode === "timeline") {
+      return yearlyAggregatedData;
+    }
     return historicalData;
-  }, [viewMode, data, historyYearFilter, yearlyDataMap, historicalData]);
+  }, [viewMode, data, historyYearFilter, historyDisplayMode, yearlyAggregatedData, yearlyDataMap, historicalData]);
 
-  // Dimensoes padrao para o SVG
+  // Dimensões padrão para o SVG
   const width = 800;
   const height = 300;
   const padding = { top: 35, right: 30, bottom: 45, left: 55 };
@@ -136,7 +166,7 @@ export default function MonthlyLineChart({
     return max === 0 ? 100 : max * 1.15;
   }, [activeData, activeSeries]);
 
-  // Pontos de coordenadas X, Y para a visualização padrão / filtro por ano
+  // Pontos de coordenadas X, Y para a visualização padrão / linha contínua por ano
   const points = useMemo(() => {
     if (!activeData || activeData.length === 0) return { p1: [], p2: [] };
 
@@ -211,7 +241,6 @@ export default function MonthlyLineChart({
   const comparativeChartData = useMemo(() => {
     if (viewMode !== "history" || historyDisplayMode !== "comparative") return null;
 
-    // Encontrar valor máximo considerando todos os anos no comparativo
     let max = 0;
     historyYears.forEach(yr => {
       const items = yearlyDataMap[yr] || [];
@@ -222,14 +251,12 @@ export default function MonthlyLineChart({
     });
     const maxComparativeVal = max === 0 ? 100 : max * 1.15;
 
-    const stepX = graphWidth / 11; // 12 meses (0 a 11)
+    const stepX = graphWidth / 11;
 
-    // Para cada ano, mapear os 12 meses
     const seriesByYear = historyYears.map((yr, yearIdx) => {
       const colorScheme = YEAR_COLORS[yearIdx % YEAR_COLORS.length];
       const items = yearlyDataMap[yr] || [];
 
-      // Criar mapa por mês (0 = Jan, ..., 11 = Dez)
       const monthMap: Record<number, ChartDataItem> = {};
       items.forEach(item => {
         let mIdx = -1;
@@ -343,7 +370,7 @@ export default function MonthlyLineChart({
         </div>
       </div>
 
-      {/* BARRA DE FILTROS E SUB-MODOS PARA A EVOLUÇÃO HISTÓRICA (SEPARADA POR ANO) */}
+      {/* BARRA DE FILTROS E SUB-MODOS PARA A EVOLUÇÃO HISTÓRICA (APENAS POR ANOS) */}
       {viewMode === "history" && (
         <div style={{
           display: 'flex',
@@ -401,6 +428,25 @@ export default function MonthlyLineChart({
             {historyYearFilter === "all" && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'var(--surface-high)', padding: '3px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.06)' }}>
                 <button
+                  onClick={() => setHistoryDisplayMode("timeline")}
+                  title="Linha contínua com intervalos de anos"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    padding: '4px 10px',
+                    fontSize: '10px',
+                    fontWeight: 800,
+                    borderRadius: '6px',
+                    border: 'none',
+                    background: historyDisplayMode === "timeline" ? 'var(--primary)' : 'transparent',
+                    color: historyDisplayMode === "timeline" ? '#000' : 'var(--text-muted)',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <Split size={12} /> Linha Contínua (Ano a Ano)
+                </button>
+                <button
                   onClick={() => setHistoryDisplayMode("comparative")}
                   title="Comparativo Ano x Ano com linhas sobrepostas"
                   style={{
@@ -417,7 +463,7 @@ export default function MonthlyLineChart({
                     cursor: 'pointer'
                   }}
                 >
-                  <LineChart size={12} /> Comparativo Ano x Ano
+                  <LineChart size={12} /> Comparativo Sobreposto
                 </button>
                 <button
                   onClick={() => setHistoryDisplayMode("separated")}
@@ -437,25 +483,6 @@ export default function MonthlyLineChart({
                   }}
                 >
                   <Grid size={12} /> Cards por Ano
-                </button>
-                <button
-                  onClick={() => setHistoryDisplayMode("timeline")}
-                  title="Linha do tempo contínua organizada"
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    padding: '4px 10px',
-                    fontSize: '10px',
-                    fontWeight: 800,
-                    borderRadius: '6px',
-                    border: 'none',
-                    background: historyDisplayMode === "timeline" ? 'var(--primary)' : 'transparent',
-                    color: historyDisplayMode === "timeline" ? '#000' : 'var(--text-muted)',
-                    cursor: 'pointer'
-                  }}
-                >
-                  <Split size={12} /> Linha Contínua
                 </button>
               </div>
             )}
@@ -552,7 +579,11 @@ export default function MonthlyLineChart({
         <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
           {viewMode === "year" 
             ? `Exibindo os 12 meses de ${selectedYear}` 
-            : (historyYearFilter === "all" ? `Evolução Histórica (${historyYears.length} anos registrados)` : `Evolução Histórica de ${historyYearFilter}`)}
+            : (historyYearFilter === "all" 
+                ? (historyDisplayMode === "timeline"
+                    ? `Evolução Histórica por Ano (${yearlyAggregatedData.length} anos)`
+                    : `Evolução Histórica (${historyYears.length} anos registrados)`)
+                : `Evolução Histórica de ${historyYearFilter}`)}
         </span>
       </div>
 
@@ -770,7 +801,7 @@ export default function MonthlyLineChart({
           )}
         </div>
       ) : (
-        /* RENDERIZAÇÃO 3: GRÁFICO PADRÃO / ANO SELECIONADO OU HISTÓRICO FILTRADO POR ANO ESPECÍFICO */
+        /* RENDERIZAÇÃO 3: GRÁFICO DE LINHA CONTÍNUA ESTRITAMENTE POR ANOS OU ANO INDIVIDUAL SELECIONADO */
         <div style={{ position: 'relative', width: '100%', overflowX: 'auto', background: 'rgba(0,0,0,0.2)', borderRadius: '16px', padding: '1rem 0', border: '1px solid rgba(255,255,255,0.04)' }}>
           {activeData.length === 0 ? (
             <div style={{ padding: '4rem 2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
@@ -818,59 +849,24 @@ export default function MonthlyLineChart({
                 );
               })}
 
-              {/* Rótulos do Eixo X com espaçamento dinâmico para evitar colisão */}
+              {/* Rótulos do Eixo X em Anos */}
               {activeData.map((d, i) => {
                 const stepX = activeData.length > 1 ? graphWidth / (activeData.length - 1) : graphWidth;
                 const x = padding.left + (activeData.length === 1 ? graphWidth / 2 : i * stepX);
-                
-                // Pular rotulos intermediarios se houver muitos dados acumulados (ex: > 16 meses)
-                const showLabel = activeData.length <= 16 || i % Math.ceil(activeData.length / 12) === 0 || i === activeData.length - 1;
-                
-                if (!showLabel) return null;
+                const isYearLabel = viewMode === "history" && historyDisplayMode === "timeline" && historyYearFilter === "all";
 
                 return (
                   <text
                     key={i}
                     x={x}
                     y={height - 12}
-                    fill="rgba(255, 255, 255, 0.7)"
-                    fontSize="11"
-                    fontWeight="700"
+                    fill={isYearLabel ? "var(--primary)" : "rgba(255, 255, 255, 0.7)"}
+                    fontSize={isYearLabel ? "13" : "11"}
+                    fontWeight="800"
                     textAnchor="middle"
                   >
-                    {d.label}
+                    {isYearLabel ? `ANO ${d.label}` : d.label}
                   </text>
-                );
-              })}
-
-              {/* Divisores verticais de transição de ano se estiver na linha contínua multi-anos */}
-              {viewMode === "history" && historyYearFilter === "all" && activeData.map((d, i) => {
-                const nextItem = activeData[i + 1];
-                if (!nextItem || d.year === nextItem.year) return null;
-
-                const stepX = activeData.length > 1 ? graphWidth / (activeData.length - 1) : graphWidth;
-                const x = padding.left + i * stepX + stepX / 2;
-
-                return (
-                  <g key={`year-divider-${i}`}>
-                    <line
-                      x1={x}
-                      y1={padding.top}
-                      x2={x}
-                      y2={padding.top + graphHeight}
-                      stroke="rgba(0, 242, 255, 0.25)"
-                      strokeDasharray="2 2"
-                    />
-                    <text
-                      x={x + 4}
-                      y={padding.top + 14}
-                      fill="var(--primary)"
-                      fontSize="9"
-                      fontWeight="900"
-                    >
-                      {nextItem.year} →
-                    </text>
-                  </g>
                 );
               })}
 
@@ -930,10 +926,10 @@ export default function MonthlyLineChart({
                   <circle
                     cx={p.x}
                     cy={p.y}
-                    r="6"
+                    r="7"
                     fill="var(--primary)"
                     stroke="#fff"
-                    strokeWidth="2"
+                    strokeWidth="2.5"
                     style={{ cursor: 'pointer', transition: 'all 0.2s ease' }}
                     onMouseEnter={() => setHoveredPoint({ idx: i, item: p.item, x: p.x, y: p.y })}
                     onMouseLeave={() => setHoveredPoint(null)}
@@ -976,7 +972,7 @@ export default function MonthlyLineChart({
               }}
             >
               <p style={{ fontSize: '12px', fontWeight: 900, color: '#fff', margin: 0, borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '4px' }}>
-                {hoveredPoint.item.fullLabel || hoveredPoint.item.label}
+                {hoveredPoint.item.fullLabel || `Ano ${hoveredPoint.item.label}`}
               </p>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', fontSize: '11px' }}>
                 <span style={{ color: 'var(--primary)', fontWeight: 700 }}>{metric1Label}:</span>
